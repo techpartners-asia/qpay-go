@@ -16,6 +16,8 @@ type qpay_auth struct {
 	loginObject *qpayLoginResponse
 }
 
+// Wechat not supported
+
 type QPayAuth interface {
 	// CreateInvoice(input QPayCreateInvoiceInput) (QPaySimpleInvoiceResponse, QPayAuth, error)
 	// GetInvoice(invoiceId string) (QpayInvoiceGetResponse, QPayAuth, error)
