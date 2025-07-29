@@ -109,7 +109,7 @@ type (
 	QpayRow struct {
 		PaymentID       string      `json:"payment_id"`       // QPay-ээс үүссэн гүйлгээний дугаар
 		PaymentStatus   string      `json:"payment_status"`   // Гүйлгээ төлөв // NEW: Гүйлгээ үүсгэгдсэн // FAILED: Гүйлгээ амжилтгүй // PAID: Төлөгдсөн // REFUNDED: Гүйлгээ буцаагдсан
-		PaymentDate     interface{} `json:"payment_date"`     // Гүйлгээ хийгдсэн хугацаа
+		PaymentDate     string	    `json:"payment_date"`     // Гүйлгээ хийгдсэн хугацаа
 		PaymentFee      string      `json:"payment_fee"`      // Гүйлгээний шимтгэл шимтгэл
 		PaymentAmount   string      `json:"payment_amount"`   // Гүйлгээний дүн
 		PaymentCurrency string      `json:"payment_currency"` // Гүйлгээний валют
