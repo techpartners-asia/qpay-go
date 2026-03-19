@@ -55,7 +55,7 @@ type QPay interface {
 
 	// GetPaymentList [Төлбөрийн жагсаалт авах]
 	// See: https://developer.qpay.mn/#payment-list
-	GetPaymentList(pageLimit, pageNumber int64) (QpayPaymentCheckResponse, error)
+	GetPaymentList(input QPayPaymentListInput) (QpayPaymentListResponse, error)
 }
 
 // Option defines an option for qpay initialization.
@@ -111,12 +111,25 @@ func (q *qpay) CreateInvoice(input QPayCreateInvoiceInput) (QPaySimpleInvoiceRes
 		callbackUrl = fmt.Sprintf("%s?%s", q.callback, vals.Encode())
 	}
 
+	// Handle nulls for min/max amounts by using interface{} as defined in structs.go
+	var minAmt interface{} = nil
+	if input.MinimumAmount > 0 {
+		minAmt = input.MinimumAmount
+	}
+	var maxAmt interface{} = nil
+	if input.MaximumAmount > 0 {
+		maxAmt = input.MaximumAmount
+	}
+
 	request := QPaySimpleInvoiceRequest{
 		InvoiceCode:         q.invoiceCode,
-		SenderInvoiceCode:   input.SenderCode,
+		SenderInvoiceNo:     input.SenderCode,
 		SenderBranchCode:    input.SenderBranchCode,
+		SenderBranchData:    input.SenderBranchData,
 		SenderTerminalCode:  input.SenderTerminalCode,
+		SenderTerminalData:  input.SenderTerminalData,
 		SenderStaffCode:     input.SenderStaffCode,
+		SenderStaffData:     input.SenderStaffData,
 		InvoiceReceiverCode: input.ReceiverCode,
 		InvoiceReceiverData: input.ReceiverData,
 		InvoiceDescription:  input.Description,
@@ -126,12 +139,15 @@ func (q *qpay) CreateInvoice(input QPayCreateInvoiceInput) (QPaySimpleInvoiceRes
 		ExpiryDate:          input.ExpiryDate,
 		EnableExpiry:        input.EnableExpiry,
 		AllowPartial:        input.AllowPartial,
-		MinimumAmount:       input.MinimumAmount,
+		MinimumAmount:       minAmt,
 		AllowExceed:         input.AllowExceed,
-		MaximumAmount:       input.MaximumAmount,
+		MaximumAmount:       maxAmt,
 		CalculateVat:        input.CalculateVat,
 		Lines:               input.Lines,
 		Note:                input.Note,
+		TaxCustomerCode:     input.TaxCustomerCode,
+		LineTaxCode:         input.LineTaxCode,
+		Transactions:        input.Transactions,
 	}
 
 	var response QPaySimpleInvoiceResponse
@@ -229,19 +245,35 @@ func (q *qpay) RefundPayment(invoiceId, paymentId string) (QpayGeneralResponse, 
 }
 
 // GetPaymentList [Төлбөр төлөлтийн жагсаалт авах]
-func (q *qpay) GetPaymentList(pageLimit, pageNumber int64) (QpayPaymentCheckResponse, error) {
+func (q *qpay) GetPaymentList(input QPayPaymentListInput) (QpayPaymentListResponse, error) {
+	// Default to MERCHANT if not specified
+	objType := input.ObjectType
+	if objType == "" {
+		objType = "MERCHANT"
+	}
+
+	// Default to q.merchantId if not specified
+	objID := input.ObjectID
+	if objID == "" {
+		objID = q.merchantId
+	}
+
 	req := QpayPaymentListRequest{
-		MerchantID: q.merchantId,
+		ObjectType:           objType,
+		ObjectID:             objID,
+		MerchantBranchCode:   input.BranchCode,
+		MerchantTerminalCode: input.TerminalCode,
+		MerchantStaffCode:    input.StaffCode,
 		Offset: QpayOffset{
-			PageLimit:  pageLimit,
-			PageNumber: pageNumber,
+			PageLimit:  input.PageLimit,
+			PageNumber: input.PageNumber,
 		},
 	}
 
-	var response QpayPaymentCheckResponse
+	var response QpayPaymentListResponse
 	err := q.httpRequestQPay(req, &response, QPayPaymentList, "")
 	if err != nil {
-		return QpayPaymentCheckResponse{}, err
+		return QpayPaymentListResponse{}, err
 	}
 
 	return response, nil
