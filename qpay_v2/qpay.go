@@ -1,9 +1,10 @@
 package qpay_v2
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/url"
+
+	"resty.dev/v3"
 )
 
 type qpay struct {
@@ -14,6 +15,7 @@ type qpay struct {
 	invoiceCode string
 	merchantId  string
 	loginObject *qpayLoginResponse
+	client      *resty.Client
 }
 
 type QPay interface {
@@ -24,26 +26,51 @@ type QPay interface {
 	CheckPayment(invoiceId string, pageLimit, pageNumber int64) (QpayPaymentCheckResponse, QPay, error)
 	CancelPayment(invoiceId, paymentUUID string) (QpayPaymentCheckResponse, QPay, error)
 	RefundPayment(invoiceId, paymentUUID string) (interface{}, QPay, error)
+	SetClient(client *resty.Client)
 	// GetPaymentList()
 }
 
-func New(username, password, endpoint, callback, invoiceCode, merchantId string) QPay {
-	return &qpay{
+// Option defines an option for qpay initialization.
+type Option func(*qpay)
+
+// WithClient allows providing a custom resty.Client instance.
+// This is useful for injecting a client with custom timeouts,
+// certificates, middlewares, or connection pools.
+func WithClient(client *resty.Client) Option {
+	return func(q *qpay) {
+		q.client = client
+	}
+}
+
+func New(username, password, endpoint, callback, invoiceCode, merchantId string, options ...Option) QPay {
+	q := &qpay{
 		endpoint:    endpoint,
 		password:    password,
 		username:    username,
 		callback:    callback,
 		invoiceCode: invoiceCode,
 		merchantId:  merchantId,
-		loginObject: func() *qpayLoginResponse {
-			authObj, authErr := authQPayV2(username, password, endpoint, callback, invoiceCode, merchantId)
-			if authErr != nil {
-				// err = authErr
-				return &qpayLoginResponse{}
-			}
-			return &authObj
-		}(),
+		client:      resty.New(),
 	}
+
+	for _, opt := range options {
+		opt(q)
+	}
+
+	// Login right after setting configuration/client
+	q.loginObject = func() *qpayLoginResponse {
+		authObj, authErr := authQPayV2(username, password, endpoint, callback, invoiceCode, merchantId)
+		if authErr != nil {
+			return &qpayLoginResponse{}
+		}
+		return &authObj
+	}()
+
+	return q
+}
+
+func (q *qpay) SetClient(client *resty.Client) {
+	q.client = client
 }
 
 func (q *qpay) CreateInvoice(input QPayCreateInvoiceInput) (QPaySimpleInvoiceResponse, QPay, error) {
@@ -63,47 +90,39 @@ func (q *qpay) CreateInvoice(input QPayCreateInvoiceInput) (QPaySimpleInvoiceRes
 		CallbackUrl:         fmt.Sprintf("%s?%s", q.callback, vals.Encode()),
 	}
 
-	res, err := q.httpRequestQPay(request, QPayInvoiceCreate, "")
+	var response QPaySimpleInvoiceResponse
+	err := q.httpRequestQPay(request, &response, QPayInvoiceCreate, "")
 	if err != nil {
 		return QPaySimpleInvoiceResponse{}, q, err
 	}
 
-	var response QPaySimpleInvoiceResponse
-	json.Unmarshal(res, &response)
-
 	return response, q, nil
 }
 func (q *qpay) GetInvoice(invoiceId string) (QpayInvoiceGetResponse, QPay, error) {
-	res, err := q.httpRequestQPay(nil, QPayInvoiceGet, invoiceId)
+	var response QpayInvoiceGetResponse
+	err := q.httpRequestQPay(nil, &response, QPayInvoiceGet, invoiceId)
 	if err != nil {
 		return QpayInvoiceGetResponse{}, q, err
 	}
 
-	var response QpayInvoiceGetResponse
-	json.Unmarshal(res, &response)
-
 	return response, q, nil
 }
 func (q *qpay) CancelInvoice(invoiceId string) (interface{}, QPay, error) {
-	res, err := q.httpRequestQPay(nil, QPayInvoiceCancel, invoiceId)
+	var response interface{}
+	err := q.httpRequestQPay(nil, &response, QPayInvoiceCancel, invoiceId)
 	if err != nil {
 		return nil, q, err
 	}
-
-	var response interface{}
-	json.Unmarshal(res, &response)
 
 	return response, q, nil
 }
 
 func (q *qpay) GetPayment(invoiceId string) (interface{}, QPay, error) {
-	res, err := q.httpRequestQPay(nil, QPayPaymentGet, invoiceId)
+	var response interface{}
+	err := q.httpRequestQPay(nil, &response, QPayPaymentGet, invoiceId)
 	if err != nil {
 		return nil, q, err
 	}
-
-	var response interface{}
-	json.Unmarshal(res, &response)
 
 	return response, q, nil
 }
@@ -116,13 +135,10 @@ func (q *qpay) CheckPayment(invoiceId string, pageLimit, pageNumber int64) (Qpay
 	req.Offset.PageNumber = pageNumber
 
 	var response QpayPaymentCheckResponse
-
-	res, err := q.httpRequestQPay(req, QPayPaymentCheck, "")
+	err := q.httpRequestQPay(req, &response, QPayPaymentCheck, "")
 	if err != nil {
 		return response, q, err
 	}
-
-	json.Unmarshal(res, &response)
 
 	return response, q, nil
 }
@@ -134,24 +150,10 @@ func (q *qpay) CancelPayment(invoiceId, paymentUUID string) (QpayPaymentCheckRes
 	req.Note = "Cancel payment - " + invoiceId
 
 	var response QpayPaymentCheckResponse
-
-	res, err := q.httpRequestQPay(req, QPayPaymentCancel, invoiceId)
-	// ret := func() QPay {
-	// 	return &qpay{
-	// 		endpoint:    q.endpoint,
-	// 		password:    q.password,
-	// 		username:    q.username,
-	// 		callback:    q.callback,
-	// 		invoiceCode: q.invoiceCode,
-	// 		merchantId:  q.merchantId,
-	// 		loginObject: q.loginObject,
-	// 	}
-	// }()
+	err := q.httpRequestQPay(req, &response, QPayPaymentCancel, invoiceId)
 	if err != nil {
 		return response, q, err
 	}
-
-	json.Unmarshal(res, &response)
 
 	return response, q, nil
 }
@@ -163,13 +165,10 @@ func (q *qpay) RefundPayment(invoiceId, paymentUUID string) (interface{}, QPay, 
 	req.Note = "Cancel payment - " + invoiceId
 
 	var response interface{}
-
-	res, err := q.httpRequestQPay(req, QPayPaymentRefund, invoiceId)
+	err := q.httpRequestQPay(req, &response, QPayPaymentRefund, invoiceId)
 	if err != nil {
 		return response, q, err
 	}
-
-	json.Unmarshal(res, &response)
 
 	return response, q, nil
 }
