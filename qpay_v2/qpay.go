@@ -19,6 +19,7 @@ type qpay struct {
 	loginObject *qpayLoginResponse
 	loginTime   time.Time
 	mu          sync.RWMutex
+	refreshMu   sync.Mutex // Serializes re-auth calls when mu is unlocked
 	client      *resty.Client
 }
 
@@ -26,35 +27,35 @@ type qpay struct {
 type QPay interface {
 	// CreateInvoice [Төлбөрийн нэхэмжлэл үүсгэх]
 	// See: https://developer.qpay.mn/#invoice-Create
-	CreateInvoice(input QPayCreateInvoiceInput) (QPaySimpleInvoiceResponse, QPay, error)
+	CreateInvoice(input QPayCreateInvoiceInput) (QPaySimpleInvoiceResponse, error)
 
 	// GetInvoice [Үүсгэсэн нэхэмжлэлийн мэдээлэл харах]
 	// See: https://developer.qpay.mn/#invoice-Get
-	GetInvoice(invoiceId string) (QpayInvoiceGetResponse, QPay, error)
+	GetInvoice(invoiceId string) (QpayInvoiceGetResponse, error)
 
 	// CancelInvoice [Нэхэмжлэх цуцлах]
 	// See: https://developer.qpay.mn/#invoice-Cancel
-	CancelInvoice(invoiceId string) (interface{}, QPay, error)
+	CancelInvoice(invoiceId string) (QpayGeneralResponse, error)
 
 	// GetPayment [Төлбөрийн мэдээлэл татах]
 	// See: https://developer.qpay.mn/#payment-Get
-	GetPayment(paymentId string) (interface{}, QPay, error)
+	GetPayment(paymentId string) (QpayTransaction, error)
 
 	// CheckPayment [Төлбөр төлөгдсөн эсэхийг шалгах]
 	// See: https://developer.qpay.mn/#payment-check
-	CheckPayment(invoiceId string, pageLimit, pageNumber int64) (QpayPaymentCheckResponse, QPay, error)
+	CheckPayment(invoiceId string, pageLimit, pageNumber int64) (QpayPaymentCheckResponse, error)
 
 	// CancelPayment [Төлөгдсөн төлбөрийг цуцлах]
 	// See: https://developer.qpay.mn/#payment-cancel
-	CancelPayment(invoiceId, paymentId string) (QpayPaymentCheckResponse, QPay, error)
+	CancelPayment(invoiceId, paymentId string) (QpayGeneralResponse, error)
 
 	// RefundPayment [Төлбөр буцаах]
 	// See: https://developer.qpay.mn/#payment-refund
-	RefundPayment(invoiceId, paymentId string) (interface{}, QPay, error)
+	RefundPayment(invoiceId, paymentId string) (QpayGeneralResponse, error)
 
 	// GetPaymentList [Төлбөрийн жагсаалт авах]
 	// See: https://developer.qpay.mn/#payment-list
-	GetPaymentList(pageLimit, pageNumber int64) (interface{}, QPay, error)
+	GetPaymentList(pageLimit, pageNumber int64) (QpayPaymentCheckResponse, error)
 }
 
 // Option defines an option for qpay initialization.
@@ -75,7 +76,7 @@ func WithClient(client *resty.Client) Option {
 // callback: Төлбөр төлөгдсөний дараа дуудагдах URL
 // invoiceCode: qPay нэхэмжлэхийн код
 // merchantId: Байгууллагын ID
-func New(username, password, endpoint, callback, invoiceCode, merchantId string, options ...Option) (QPay, error) {
+func New(username, password, endpoint, callback, invoiceCode, merchantId string, options ...Option) QPay {
 	q := &qpay{
 		endpoint:    endpoint,
 		password:    password,
@@ -83,31 +84,23 @@ func New(username, password, endpoint, callback, invoiceCode, merchantId string,
 		callback:    callback,
 		invoiceCode: invoiceCode,
 		merchantId:  merchantId,
-		client:      resty.New(),
+		client:      resty.New().SetTimeout(60 * time.Second),
 	}
 
 	for _, opt := range options {
 		opt(q)
 	}
 
-	// Initial authentication to verify credentials and warm up the cache
-	_, authErr := q.authQPayV2()
-	if authErr != nil {
-		return nil, authErr
-	}
+	// Attempt login in background to warm the token cache.
+	// If it fails (network down or bad config), authQPayV2 will retry
+	// transparently on the first real API call.
+	go q.authQPayV2() //nolint:errcheck
 
-	return q, nil
-}
-
-// SetClient [Гаднаас resty.Client тохируулах]
-func (q *qpay) SetClient(client *resty.Client) {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	q.client = client
+	return q
 }
 
 // CreateInvoice [Нэхэмжлэх үүсгэх]
-func (q *qpay) CreateInvoice(input QPayCreateInvoiceInput) (QPaySimpleInvoiceResponse, QPay, error) {
+func (q *qpay) CreateInvoice(input QPayCreateInvoiceInput) (QPaySimpleInvoiceResponse, error) {
 	vals := url.Values{}
 	for k, v := range input.CallbackParam {
 		vals.Add(k, v)
@@ -122,11 +115,21 @@ func (q *qpay) CreateInvoice(input QPayCreateInvoiceInput) (QPaySimpleInvoiceRes
 		InvoiceCode:         q.invoiceCode,
 		SenderInvoiceCode:   input.SenderCode,
 		SenderBranchCode:    input.SenderBranchCode,
+		SenderTerminalCode:  input.SenderTerminalCode,
+		SenderStaffCode:     input.SenderStaffCode,
 		InvoiceReceiverCode: input.ReceiverCode,
 		InvoiceReceiverData: input.ReceiverData,
 		InvoiceDescription:  input.Description,
 		Amount:              input.Amount,
 		CallbackUrl:         callbackUrl,
+		InvoiceDueDate:      input.InvoiceDueDate,
+		ExpiryDate:          input.ExpiryDate,
+		EnableExpiry:        input.EnableExpiry,
+		AllowPartial:        input.AllowPartial,
+		MinimumAmount:       input.MinimumAmount,
+		AllowExceed:         input.AllowExceed,
+		MaximumAmount:       input.MaximumAmount,
+		CalculateVat:        input.CalculateVat,
 		Lines:               input.Lines,
 		Note:                input.Note,
 	}
@@ -134,47 +137,47 @@ func (q *qpay) CreateInvoice(input QPayCreateInvoiceInput) (QPaySimpleInvoiceRes
 	var response QPaySimpleInvoiceResponse
 	err := q.httpRequestQPay(request, &response, QPayInvoiceCreate, "")
 	if err != nil {
-		return QPaySimpleInvoiceResponse{}, q, err
+		return QPaySimpleInvoiceResponse{}, err
 	}
 
-	return response, q, nil
+	return response, nil
 }
 
 // GetInvoice [Нэхэмжлэхийн мэдээлэл авах]
-func (q *qpay) GetInvoice(invoiceId string) (QpayInvoiceGetResponse, QPay, error) {
+func (q *qpay) GetInvoice(invoiceId string) (QpayInvoiceGetResponse, error) {
 	var response QpayInvoiceGetResponse
 	err := q.httpRequestQPay(nil, &response, QPayInvoiceGet, invoiceId)
 	if err != nil {
-		return QpayInvoiceGetResponse{}, q, err
+		return QpayInvoiceGetResponse{}, err
 	}
 
-	return response, q, nil
+	return response, nil
 }
 
 // CancelInvoice [Үүсгэсэн нэхэмжлэлийг цуцлах]
-func (q *qpay) CancelInvoice(invoiceId string) (interface{}, QPay, error) {
-	var response interface{}
+func (q *qpay) CancelInvoice(invoiceId string) (QpayGeneralResponse, error) {
+	var response QpayGeneralResponse
 	err := q.httpRequestQPay(nil, &response, QPayInvoiceCancel, invoiceId)
 	if err != nil {
-		return nil, q, err
+		return QpayGeneralResponse{}, err
 	}
 
-	return response, q, nil
+	return response, nil
 }
 
 // GetPayment [Төлбөрийн мэдээлэл татах]
-func (q *qpay) GetPayment(paymentId string) (interface{}, QPay, error) {
-	var response interface{}
+func (q *qpay) GetPayment(paymentId string) (QpayTransaction, error) {
+	var response QpayTransaction
 	err := q.httpRequestQPay(nil, &response, QPayPaymentGet, paymentId)
 	if err != nil {
-		return nil, q, err
+		return QpayTransaction{}, err
 	}
 
-	return response, q, nil
+	return response, nil
 }
 
 // CheckPayment [Нэхэмжлэлийн төлбөрийг шалгах]
-func (q *qpay) CheckPayment(invoiceId string, pageLimit, pageNumber int64) (QpayPaymentCheckResponse, QPay, error) {
+func (q *qpay) CheckPayment(invoiceId string, pageLimit, pageNumber int64) (QpayPaymentCheckResponse, error) {
 	req := QpayPaymentCheckRequest{
 		ObjectType: "INVOICE",
 		ObjectID:   invoiceId,
@@ -187,46 +190,46 @@ func (q *qpay) CheckPayment(invoiceId string, pageLimit, pageNumber int64) (Qpay
 	var response QpayPaymentCheckResponse
 	err := q.httpRequestQPay(req, &response, QPayPaymentCheck, "")
 	if err != nil {
-		return response, q, err
+		return response, err
 	}
 
-	return response, q, nil
+	return response, nil
 }
 
 // CancelPayment [Төлөгдсөн төлбөрийг цуцлах]
-func (q *qpay) CancelPayment(invoiceId, paymentId string) (QpayPaymentCheckResponse, QPay, error) {
+func (q *qpay) CancelPayment(invoiceId, paymentId string) (QpayGeneralResponse, error) {
 	req := QpayPaymentCancelRequest{
 		CallbackUrl: q.callback,
 		Note:        "Cancel payment for invoice: " + invoiceId,
 	}
 
-	var response QpayPaymentCheckResponse
+	var response QpayGeneralResponse
 	err := q.httpRequestQPay(req, &response, QPayPaymentCancel, paymentId)
 	if err != nil {
-		return response, q, err
+		return QpayGeneralResponse{}, err
 	}
 
-	return response, q, nil
+	return response, nil
 }
 
 // RefundPayment [Төлбөр буцаалт хийх]
-func (q *qpay) RefundPayment(invoiceId, paymentId string) (interface{}, QPay, error) {
+func (q *qpay) RefundPayment(invoiceId, paymentId string) (QpayGeneralResponse, error) {
 	req := QpayPaymentCancelRequest{
 		CallbackUrl: q.callback,
 		Note:        "Refund payment for invoice: " + invoiceId,
 	}
 
-	var response interface{}
+	var response QpayGeneralResponse
 	err := q.httpRequestQPay(req, &response, QPayPaymentRefund, paymentId)
 	if err != nil {
-		return response, q, err
+		return QpayGeneralResponse{}, err
 	}
 
-	return response, q, nil
+	return response, nil
 }
 
 // GetPaymentList [Төлбөр төлөлтийн жагсаалт авах]
-func (q *qpay) GetPaymentList(pageLimit, pageNumber int64) (interface{}, QPay, error) {
+func (q *qpay) GetPaymentList(pageLimit, pageNumber int64) (QpayPaymentCheckResponse, error) {
 	req := QpayPaymentListRequest{
 		MerchantID: q.merchantId,
 		Offset: QpayOffset{
@@ -235,11 +238,11 @@ func (q *qpay) GetPaymentList(pageLimit, pageNumber int64) (interface{}, QPay, e
 		},
 	}
 
-	var response interface{}
+	var response QpayPaymentCheckResponse
 	err := q.httpRequestQPay(req, &response, QPayPaymentList, "")
 	if err != nil {
-		return response, q, err
+		return QpayPaymentCheckResponse{}, err
 	}
 
-	return response, q, nil
+	return response, nil
 }
