@@ -67,8 +67,8 @@ client := qpay.New(
 
 ```go
 invoice, err := client.CreateInvoice(qpay.QPayCreateInvoiceInput{
-    SenderCode:       "INV-2024-001", // Your unique invoice/order number
-    Description:      "Order #1234",
+    SenderInvoiceNo:  "INV-2024-001", // Your unique invoice/order number
+    InvoiceDescription: "Order #1234",
     Amount:           10000,          // Amount in MNT (integer)
     CallbackParam: map[string]string{
         "order_id": "1234",

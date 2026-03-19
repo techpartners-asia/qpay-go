@@ -17,16 +17,16 @@ type (
 	// QPayCreateInvoiceInput [Нэхэмжлэх үүсгэх оролтын өгөгдөл]
 	// SDK-ийн CreateInvoice функцэд дамжуулах бүтэц.
 	QPayCreateInvoiceInput struct {
-		SenderCode           string                    // qpay-ээс өгсөн нэхэмжлэхийн код (invoice_code)
+		SenderInvoiceNo      string                    // Байгууллагаас үүсгэх давтагдашгүй нэхэмжлэлийн дугаар (sender_invoice_no)
 		SenderBranchCode     string                    // Байгууллагын салбарын код
 		SenderBranchData     *SenderBranchData         // Салбарын мэдээлэл (заавал биш)
 		SenderTerminalCode   string                    // Терминалын код
 		SenderTerminalData   *SenderTerminalData       // Терминалын мэдээлэл (заавал биш)
 		SenderStaffCode      string                    // Ажилтны код
 		SenderStaffData      *SenderStaffData          // Ажилтны мэдээлэл (заавал биш)
-		ReceiverCode         string                    // Хэрэглэгчийн ID/Код
-		ReceiverData         *InvoiceReceiverData      // Хэрэглэгчийн мэдээлэл (заавал биш)
-		Description          string                    // Нэхэмжлэлийн утга/тайлбар
+		InvoiceReceiverCode  string                    // Хэрэглэгчийн ID/Код (invoice_receiver_code)
+		InvoiceReceiverData  *InvoiceReceiverData      // Хэрэглэгчийн мэдээлэл (заавал биш)
+		InvoiceDescription   string                    // Нэхэмжлэлийн утга/тайлбар (invoice_description)
 		Amount               int64                     // Мөнгөн дүн (бүхэл тоогоор)
 		CallbackParam        map[string]string         // URL-д нэмэгдэх параметрүүд
 		Note                 string                    // Тэмдэглэл (заавал биш)

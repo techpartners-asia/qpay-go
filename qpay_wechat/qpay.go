@@ -57,10 +57,10 @@ func (q *qpay_auth) CreateInvoice(input QPayCreateInvoiceInput) (QPaySimpleInvoi
 	amountInt := int64(input.Amount)
 	request := QPaySimpleInvoiceRequest{
 		InvoiceCode:         q.invoiceCode,
-		SenderInvoiceCode:   input.SenderCode,
+		SenderInvoiceCode:   input.SenderInvoiceNo,
 		SenderBranchCode:    input.SenderBranchCode,
-		InvoiceReceiverCode: input.ReceiverCode,
-		InvoiceDescription:  input.Description,
+		InvoiceReceiverCode: input.InvoiceReceiverCode,
+		InvoiceDescription:  input.InvoiceDescription,
 		Amount:              amountInt,
 		CallbackUrl:         fmt.Sprintf("%s?%s", q.callback, vals.Encode()),
 	}
