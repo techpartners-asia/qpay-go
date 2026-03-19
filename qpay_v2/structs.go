@@ -23,7 +23,7 @@ type (
 		SenderTerminalCode   string                    // Терминалын код
 		SenderTerminalData   *SenderTerminalData       // Терминалын мэдээлэл (заавал биш)
 		SenderStaffCode      string                    // Ажилтны код
-		SenderStaffData      interface{}               // Ажилтны мэдээлэл (заавал биш)
+		SenderStaffData      *SenderStaffData          // Ажилтны мэдээлэл (заавал биш)
 		ReceiverCode         string                    // Хэрэглэгчийн ID/Код
 		ReceiverData         *InvoiceReceiverData      // Хэрэглэгчийн мэдээлэл (заавал биш)
 		Description          string                    // Нэхэмжлэлийн утга/тайлбар
@@ -68,6 +68,12 @@ type (
 	// SenderTerminalData [Терминалын мэдээлэл]
 	SenderTerminalData struct {
 		Name string `json:"name"` // Терминалын нэр
+	}
+
+	// SenderStaffData [Ажилтны мэдээлэл]
+	SenderStaffData struct {
+		Code string `json:"code,omitempty"` // Ажилтны код
+		Name string `json:"name,omitempty"` // Ажилтны нэр
 	}
 
 	// InvoiceReceiverData [Нэхэмжлэл хүлээн авагчийн мэдээлэл]
@@ -158,7 +164,7 @@ type (
 		SenderTerminalCode  string                    `json:"sender_terminal_code,omitempty"`  // Терминалын код
 		SenderTerminalData  *SenderTerminalData       `json:"sender_terminal_data,omitempty"`  // Терминалын мэдээлэл
 		SenderStaffCode     string                    `json:"sender_staff_code,omitempty"`     // Ажилтны код
-		SenderStaffData     interface{}               `json:"sender_staff_data,omitempty"`     // Ажилтны мэдээлэл
+		SenderStaffData     *SenderStaffData          `json:"sender_staff_data,omitempty"`     // Ажилтны мэдээлэл
 		InvoiceReceiverCode string                    `json:"invoice_receiver_code"`           // Хэрэглэгчийн ID/Код
 		InvoiceReceiverData *InvoiceReceiverData      `json:"invoice_receiver_data,omitempty"` // Хэрэглэгчийн мэдээлэл
 		InvoiceDescription  string                    `json:"invoice_description"`             // Нэхэмжлэлийн утга
@@ -169,7 +175,7 @@ type (
 		EnableExpiry        bool                      `json:"enable_expiry"`                   // Дуусах хугацаа ашиглах
 		AllowPartial        bool                      `json:"allow_partial"`                   // Хувааж төлөх
 		MinimumAmount       interface{}               `json:"minimum_amount"`                  // Хамгийн бага төлөх дүн (null allowed)
-		AllowExceed          bool                      `json:"allow_exceed"`                    // Илүү төлөлт
+		AllowExceed         bool                      `json:"allow_exceed"`                    // Илүү төлөлт
 		MaximumAmount       interface{}               `json:"maximum_amount"`                  // Хамгийн их төлөх дүн (null allowed)
 		CalculateVat        bool                      `json:"calculate_vat"`                   // НӨАТ тооцох
 		Note                string                    `json:"note,omitempty"`                  // Тэмдэглэл
@@ -345,11 +351,8 @@ type (
 	// QpayGeneralResponse [Ерөнхий хариу]
 	// Амжилттай болсон эсвэл алдааны мэдээллийг агуулсан ерөнхий бүтэц.
 	QpayGeneralResponse struct {
-		Error        string `json:"error,omitempty"`          // Алдааны код
-		Message      string `json:"message,omitempty"`        // Алдааны мэдээлэл
-		Status       string `json:"status,omitempty"`         // Төлөв (SUCCESS, FAILED г.м)
-		InvoiceID    string `json:"invoice_id,omitempty"`     // Нэхэмжлэлийн ID
-		PaymentID    string `json:"payment_id,omitempty"`     // Төлбөрийн ID
-		QpayShortUrl string `json:"qPay_shortUrl,omitempty"`  // Shortcut URL
+		Error   string `json:"error,omitempty"`   // Алдааны код
+		Message string `json:"message,omitempty"` // Алдааны мэдээлэл
+		Status  string `json:"status,omitempty"`  // Төлөв (SUCCESS, FAILED г.м)
 	}
 )

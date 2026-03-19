@@ -65,7 +65,9 @@ type Option func(*qpay)
 // This is useful for injecting a client with custom timeouts, certificates, etc.
 func WithClient(client *resty.Client) Option {
 	return func(q *qpay) {
-		q.client = client
+		if client != nil {
+			q.client = client
+		}
 	}
 }
 

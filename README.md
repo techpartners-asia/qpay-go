@@ -29,7 +29,7 @@ go get github.com/techpartners-asia/qpay-go
 ```go
 import qpay "github.com/techpartners-asia/qpay-go/qpay_v2"
 
-client, err := qpay.New(
+client := qpay.New(
     "YOUR_USERNAME",                // QPay username (client_id)
     "YOUR_PASSWORD",                // QPay password (client_secret)
     "https://merchant.qpay.mn/v2", // Production endpoint
@@ -37,23 +37,25 @@ client, err := qpay.New(
     "YOUR_INVOICE_CODE",            // Invoice code assigned by QPay
     "YOUR_MERCHANT_ID",             // Merchant ID
 )
-if err != nil {
-    log.Fatal(err)
-}
 ```
+
 
 **Sandbox endpoint:** `https://merchant-sandbox.qpay.mn/v2`
 
-#### Custom HTTP client
+#### Custom HTTP client & Options
 
-Use `WithClient` to inject your own `resty.Client` with custom timeouts, TLS config, or middleware:
+Use `WithClient` to inject your own `resty.Client` (e.g. for custom TLS, proxies, or logging). You can pass multiple options to `New()`:
 
 ```go
-import "resty.dev/v3"
+import (
+    "time"
+    "resty.dev/v3"
+    qpay "github.com/techpartners-asia/qpay-go/qpay_v2"
+)
 
-httpClient := resty.New().SetTimeout(10 * time.Second)
+httpClient := resty.New().SetTimeout(15 * time.Second)
 
-client, err := qpay.New(
+client := qpay.New(
     "USERNAME", "PASSWORD", "ENDPOINT", "CALLBACK", "INVOICE_CODE", "MERCHANT_ID",
     qpay.WithClient(httpClient),
 )
@@ -64,15 +66,16 @@ client, err := qpay.New(
 ### Create Invoice
 
 ```go
-invoice, _, err := client.CreateInvoice(qpay.QPayCreateInvoiceInput{
-    SenderCode:       "SENDER-001",   // Your unique invoice/order number
-    SenderBranchCode: "BRANCH-001",   // Your branch code (optional)
-    ReceiverCode:     "RECEIVER-001", // Receiver identifier (optional)
+invoice, err := client.CreateInvoice(qpay.QPayCreateInvoiceInput{
+    SenderCode:       "INV-2024-001", // Your unique invoice/order number
     Description:      "Order #1234",
     Amount:           10000,          // Amount in MNT (integer)
     CallbackParam: map[string]string{
         "order_id": "1234",
     },
+    // Advanced B2B fields (optional)
+    SenderBranchCode: "BRANCH_01",
+    InvoiceDueDate:   "2024-12-31 23:59:59",
 })
 if err != nil {
     log.Fatal(err)
@@ -87,7 +90,7 @@ fmt.Println(invoice.Urls)    // Bank app deeplinks
 ### Get Invoice
 
 ```go
-invoice, _, err := client.GetInvoice("INVOICE_ID")
+invoice, err := client.GetInvoice("INVOICE_ID")
 if err != nil {
     log.Fatal(err)
 }
@@ -98,7 +101,7 @@ fmt.Println(invoice.TotalAmount)
 ### Check Payment
 
 ```go
-result, _, err := client.CheckPayment("INVOICE_ID", 10, 1) // pageLimit, pageNumber
+result, err := client.CheckPayment("INVOICE_ID", 10, 1) // pageLimit, pageNumber
 if err != nil {
     log.Fatal(err)
 }
@@ -116,26 +119,27 @@ Payment statuses: `NEW`, `PAID`, `FAILED`, `REFUNDED`
 ### Cancel Invoice
 
 ```go
-_, _, err := client.CancelInvoice("INVOICE_ID")
+res, err := client.CancelInvoice("INVOICE_ID")
 ```
 
 ### Cancel Payment
 
 ```go
-result, _, err := client.CancelPayment("INVOICE_ID", "PAYMENT_ID")
+res, err := client.CancelPayment("INVOICE_ID", "PAYMENT_ID")
 ```
 
 ### Refund Payment
 
 ```go
-_, _, err := client.RefundPayment("INVOICE_ID", "PAYMENT_ID")
+res, err := client.RefundPayment("INVOICE_ID", "PAYMENT_ID")
 ```
 
 ### Get Payment
 
 ```go
-payment, _, err := client.GetPayment("PAYMENT_ID")
+payment, err := client.GetPayment("PAYMENT_ID")
 ```
+
 
 ---
 
