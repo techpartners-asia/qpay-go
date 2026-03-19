@@ -174,9 +174,9 @@ type (
 		ExpiryDate          string                    `json:"expiry_date,omitempty"`           // Дуусах хугацаа
 		EnableExpiry        bool                      `json:"enable_expiry"`                   // Дуусах хугацаа ашиглах
 		AllowPartial        bool                      `json:"allow_partial"`                   // Хувааж төлөх
-		MinimumAmount       interface{}               `json:"minimum_amount"`                  // Хамгийн бага төлөх дүн (null allowed)
+		MinimumAmount       *int64                    `json:"minimum_amount"`                  // Хамгийн бага төлөх дүн (null allowed)
 		AllowExceed         bool                      `json:"allow_exceed"`                    // Илүү төлөлт
-		MaximumAmount       interface{}               `json:"maximum_amount"`                  // Хамгийн их төлөх дүн (null allowed)
+		MaximumAmount       *int64                    `json:"maximum_amount"`                  // Хамгийн их төлөх дүн (null allowed)
 		CalculateVat        bool                      `json:"calculate_vat"`                   // НӨАТ тооцох
 		Note                string                    `json:"note,omitempty"`                  // Тэмдэглэл
 		Lines               []*QpayLineRequest        `json:"lines,omitempty"`                 // Нэхэмжлэлийн мөрүүд

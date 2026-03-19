@@ -113,14 +113,13 @@ func (q *qpay) CreateInvoice(input QPayCreateInvoiceInput) (QPaySimpleInvoiceRes
 		callbackUrl = fmt.Sprintf("%s?%s", q.callback, vals.Encode())
 	}
 
-	// Handle nulls for min/max amounts by using interface{} as defined in structs.go
-	var minAmt interface{} = nil
+	var minAmt *int64
 	if input.MinimumAmount > 0 {
-		minAmt = input.MinimumAmount
+		minAmt = &input.MinimumAmount
 	}
-	var maxAmt interface{} = nil
+	var maxAmt *int64
 	if input.MaximumAmount > 0 {
-		maxAmt = input.MaximumAmount
+		maxAmt = &input.MaximumAmount
 	}
 
 	request := QPaySimpleInvoiceRequest{
