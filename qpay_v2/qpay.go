@@ -1,7 +1,10 @@
 package qpay_v2
 
 import (
+	"crypto/tls"
 	"fmt"
+	"net"
+	"net/http"
 	"net/url"
 	"sync"
 	"time"
@@ -86,7 +89,7 @@ func New(username, password, endpoint, callback, invoiceCode, merchantId string,
 		callback:    callback,
 		invoiceCode: invoiceCode,
 		merchantId:  merchantId,
-		client:      resty.New().SetTimeout(60 * time.Second),
+		client:      resty.New().SetTransport(newTransport()).SetTimeout(60 * time.Second),
 	}
 
 	for _, opt := range options {
@@ -243,6 +246,28 @@ func (q *qpay) RefundPayment(invoiceId, paymentId string) (QpayGeneralResponse, 
 	}
 
 	return response, nil
+}
+
+// newTransport creates an http.Transport tuned for high-concurrency use.
+// The default Go transport allows only MaxIdleConnsPerHost=2, which forces
+// most concurrent requests to open new connections. Combined with QPay's
+// server closing idle connections aggressively, this causes EOF errors
+// when the client reuses a connection the server has already torn down.
+func newTransport() *http.Transport {
+	return &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   10 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		TLSClientConfig:      &tls.Config{MinVersion: tls.VersionTLS12},
+		MaxIdleConns:          100,
+		MaxIdleConnsPerHost:   20,
+		MaxConnsPerHost:       50,
+		IdleConnTimeout:       30 * time.Second,
+		TLSHandshakeTimeout:  10 * time.Second,
+		ResponseHeaderTimeout: 30 * time.Second,
+		ForceAttemptHTTP2:     true,
+	}
 }
 
 // GetPaymentList [Төлбөр төлөлтийн жагсаалт авах]
