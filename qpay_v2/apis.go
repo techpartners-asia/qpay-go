@@ -14,6 +14,11 @@ var (
 		Url:    "/auth/token",
 		Method: http.MethodPost,
 	}
+	// QPayAuthRefresh [Access Token шинэчлэх]
+	QPayAuthRefresh = utils.API{
+		Url:    "/auth/refresh",
+		Method: http.MethodPost,
+	}
 	// QPayInvoiceCreate [Нэхэмжлэх үүсгэх]
 	QPayInvoiceCreate = utils.API{
 		Url:    "/invoice",
@@ -105,12 +110,14 @@ func (q *qpay) httpRequestQPay(body interface{}, result interface{}, api utils.A
 
 // authQPayV2 [Internal: qPay-ээс Access Token авах/шинэчлэх]
 // Энэ функц нь токен дуусах хугацааг шалгаж, шаардлагатай бол автоматаар шинэчилнэ.
+// Access token хугацаа дуусвал refresh token ашиглан шинэчилнэ.
+// Refresh token хугацаа дуусвал бүрэн дахин нэвтэрнэ.
 // See: https://developer.qpay.mn/#auth-token
 func (q *qpay) authQPayV2() (authRes qpayLoginResponse, err error) {
-	// 1. Fast path: Read-lock check
+	// 1. Fast path: Read-lock check — access token still valid
 	q.mu.RLock()
 	if q.loginObject != nil {
-		expiryTime := q.loginTime.Add(time.Duration(q.loginObject.ExpiresIn) * time.Second)
+		expiryTime := time.Unix(int64(q.loginObject.ExpiresIn), 0)
 		if time.Now().Before(expiryTime.Add(-1 * time.Minute)) {
 			authRes = *q.loginObject
 			q.mu.RUnlock()
@@ -123,11 +130,10 @@ func (q *qpay) authQPayV2() (authRes qpayLoginResponse, err error) {
 	q.refreshMu.Lock()
 	defer q.refreshMu.Unlock()
 
-	// 3. Double-check token state with Read-lock after acquiring refreshMu
-	// (Another goroutine might have refreshed it while we were waiting on refreshMu)
+	// 3. Double-check after acquiring refreshMu
 	q.mu.RLock()
 	if q.loginObject != nil {
-		expiryTime := q.loginTime.Add(time.Duration(q.loginObject.ExpiresIn) * time.Second)
+		expiryTime := time.Unix(int64(q.loginObject.ExpiresIn), 0)
 		if time.Now().Before(expiryTime.Add(-1 * time.Minute)) {
 			authRes = *q.loginObject
 			q.mu.RUnlock()
@@ -136,7 +142,66 @@ func (q *qpay) authQPayV2() (authRes qpayLoginResponse, err error) {
 	}
 	q.mu.RUnlock()
 
-	// 4. Perform the actual network refresh (outside the main 'mu' to keep it responsive)
+	// 4. Determine whether to use refresh token or full auth
+	q.mu.RLock()
+	canRefresh := false
+	var refreshToken string
+	if q.loginObject != nil && q.loginObject.RefreshToken != "" {
+		refreshExpiry := time.Unix(int64(q.loginObject.RefreshExpiresIn), 0)
+		if time.Now().Before(refreshExpiry.Add(-1 * time.Minute)) {
+			canRefresh = true
+			refreshToken = q.loginObject.RefreshToken
+		}
+	}
+	q.mu.RUnlock()
+
+	if canRefresh {
+		// 4a. Use refresh token — lightweight, no username/password needed
+		authRes, err = q.refreshAccessToken(refreshToken)
+	} else {
+		// 4b. Full auth — first login or refresh token expired
+		authRes, err = q.fullAuth()
+	}
+	if err != nil {
+		return authRes, err
+	}
+
+	// 5. Update shared state under Write-lock
+	q.mu.Lock()
+	q.loginObject = &authRes
+	q.loginTime = time.Now()
+	q.mu.Unlock()
+
+	return authRes, nil
+}
+
+// refreshAccessToken [Internal: Refresh token ашиглан access token шинэчлэх]
+func (q *qpay) refreshAccessToken(refreshToken string) (qpayLoginResponse, error) {
+	var authRes qpayLoginResponse
+	url := q.endpoint + QPayAuthRefresh.Url
+	res, err := q.client.R().
+		SetHeader("Content-Type", "application/json").
+		SetAuthToken(refreshToken).
+		SetResult(&authRes).
+		Post(url)
+
+	if err != nil {
+		return authRes, err
+	}
+
+	if res.IsError() {
+		return authRes, fmt.Errorf("%s-QPay refresh failed: %s (Status: %d)",
+			time.Now().Format("2006-01-02 15:04:05"),
+			res.String(),
+			res.StatusCode())
+	}
+
+	return authRes, nil
+}
+
+// fullAuth [Internal: Username/password ашиглан бүрэн нэвтрэх]
+func (q *qpay) fullAuth() (qpayLoginResponse, error) {
+	var authRes qpayLoginResponse
 	url := q.endpoint + QPayAuthToken.Url
 	res, err := q.client.R().
 		SetHeader("Content-Type", "application/json").
@@ -154,12 +219,6 @@ func (q *qpay) authQPayV2() (authRes qpayLoginResponse, err error) {
 			res.String(),
 			res.StatusCode())
 	}
-
-	// 5. Update shared state under Write-lock
-	q.mu.Lock()
-	q.loginObject = &authRes
-	q.loginTime = time.Now()
-	q.mu.Unlock()
 
 	return authRes, nil
 }
