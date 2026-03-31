@@ -42,17 +42,23 @@ client := qpay.New(
 
 **Sandbox endpoint:** `https://merchant-sandbox.qpay.mn/v2`
 
-#### Custom HTTP client & Options
+#### Options
 
-Use `WithClient` to inject your own `resty.Client` (e.g. for custom TLS, proxies, or logging). You can pass multiple options to `New()`:
+You can pass options to `New()` to customize behavior:
+
+| Option | Description |
+|---|---|
+| `WithSyncAuth()` | Block until auth completes (default: async background auth) |
+| `WithClient(c)` | Inject a custom `resty.Client` (e.g. for custom TLS, proxies, or logging) |
 
 ```go
-import (
-    "time"
-    "resty.dev/v3"
-    qpay "github.com/techpartners-asia/qpay-go/qpay_v2"
+// Sync auth — New() blocks until token is ready
+client := qpay.New(
+    "USERNAME", "PASSWORD", "ENDPOINT", "CALLBACK", "INVOICE_CODE", "MERCHANT_ID",
+    qpay.WithSyncAuth(),
 )
 
+// Custom HTTP client
 httpClient := resty.New().SetTimeout(15 * time.Second)
 
 client := qpay.New(
@@ -253,7 +259,7 @@ fmt.Println(payment.InvoiceStatus) // OPEN, PAID, CLOSED
 All methods return a standard Go `error`. On HTTP errors, the error contains the raw response body from QPay.
 
 ```go
-invoice, _, err := client.CreateInvoice(input)
+invoice, err := client.CreateInvoice(input)
 if err != nil {
     log.Printf("QPay error: %v", err)
     return
