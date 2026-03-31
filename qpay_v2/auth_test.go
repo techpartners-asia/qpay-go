@@ -24,8 +24,8 @@ func newMockServer(t *testing.T, authCalls *atomic.Int32, refreshCalls *atomic.I
 			TokenType:        "bearer",
 			AccessToken:      "test-access-token",
 			RefreshToken:     "test-refresh-token",
-			ExpiresIn:        1775034559,
-			RefreshExpiresIn: 1775034559,
+			ExpiresIn:        int(time.Now().Add(24 * time.Hour).Unix()),
+			RefreshExpiresIn: int(time.Now().Add(48 * time.Hour).Unix()),
 			Scope:            "get_token",
 			SessionState:     "test",
 		}
@@ -149,8 +149,8 @@ func TestRefreshFails_FallsBackToFullAuth(t *testing.T) {
 			TokenType:        "bearer",
 			AccessToken:      "test-access-token",
 			RefreshToken:     "test-refresh-token",
-			ExpiresIn:        1775034559,
-			RefreshExpiresIn: 1775034559,
+			ExpiresIn:        int(time.Now().Add(24 * time.Hour).Unix()),
+			RefreshExpiresIn: int(time.Now().Add(48 * time.Hour).Unix()),
 			Scope:            "get_token",
 		}
 		switch r.URL.Path {
@@ -199,8 +199,8 @@ func TestSingleflight_ConcurrentCallsMakeOneRequest(t *testing.T) {
 			TokenType:        "bearer",
 			AccessToken:      "test-access-token",
 			RefreshToken:     "test-refresh-token",
-			ExpiresIn:        1775034559,
-			RefreshExpiresIn: 1775034559,
+			ExpiresIn:        int(time.Now().Add(24 * time.Hour).Unix()),
+			RefreshExpiresIn: int(time.Now().Add(48 * time.Hour).Unix()),
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp)
