@@ -20,6 +20,7 @@ type qpay struct {
 	callback    string
 	invoiceCode string
 	merchantId  string
+	syncAuth    bool // If true, New() blocks until auth completes
 	loginObject *qpayLoginResponse
 	loginTime   time.Time
 	mu          sync.RWMutex
@@ -75,6 +76,16 @@ func WithClient(client *resty.Client) Option {
 	}
 }
 
+// WithSyncAuth [Эхлүүлэхдээ auth дуустал хүлээх]
+// By default, auth runs in the background so New() returns immediately.
+// Use this option to block until auth completes — useful when you need
+// a valid token before making the first API call.
+func WithSyncAuth() Option {
+	return func(q *qpay) {
+		q.syncAuth = true
+	}
+}
+
 // New [QPay V2 SDK-ийг шинээр үүсгэх]
 // username: qPay-ээс өгсөн хэрэглэгчийн нэр (client_id)
 // password: qPay-ээс өгсөн нууц үг (client_secret)
@@ -97,10 +108,15 @@ func New(username, password, endpoint, callback, invoiceCode, merchantId string,
 		opt(q)
 	}
 
-	// Attempt login in background to warm the token cache.
-	// If it fails (network down or bad config), authQPayV2 will retry
-	// transparently on the first real API call.
-	go q.authQPayV2() //nolint:errcheck
+	if q.syncAuth {
+		// Block until auth completes — caller knows immediately if auth fails.
+		q.authQPayV2() //nolint:errcheck
+	} else {
+		// Attempt login in background to warm the token cache.
+		// If it fails (network down or bad config), authQPayV2 will retry
+		// transparently on the first real API call.
+		go q.authQPayV2() //nolint:errcheck
+	}
 
 	return q
 }
