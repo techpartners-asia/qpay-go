@@ -22,7 +22,6 @@ type qpay struct {
 	merchantId  string
 	syncAuth    bool // If true, New() blocks until auth completes
 	loginObject *qpayLoginResponse
-	loginTime   time.Time
 	mu          sync.RWMutex
 	authGroup   singleflight.Group // Coalesces concurrent auth calls into one
 	client      *resty.Client

@@ -6,9 +6,9 @@ type (
 	qpayLoginResponse struct {
 		TokenType        string `json:"token_type"`         // Токены төрөл (Bearer)
 		RefreshToken     string `json:"refresh_token"`       // Шинэчлэх токен
-		RefreshExpiresIn int    `json:"refresh_expires_in"` // Шинэчлэх токены хүчинтэй хугацаа (сек)
+		RefreshExpiresIn int64  `json:"refresh_expires_in"` // Шинэчлэх токены хүчинтэй хугацаа (Unix timestamp)
 		AccessToken      string `json:"access_token"`       // Хандалтын токен
-		ExpiresIn        int    `json:"expires_in"`         // Хандалтын токены хүчинтэй хугацаа (сек)
+		ExpiresIn        int64  `json:"expires_in"`         // Хандалтын токены хүчинтэй хугацаа (Unix timestamp)
 		Scope            string `json:"scope"`               // Хандах хүрээ
 		NotBeforePolicy  string `json:"not-before-policy"`  // Бодлого
 		SessionState     string `json:"session_state"`      // Сессийн төлөв

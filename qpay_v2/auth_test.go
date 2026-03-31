@@ -24,8 +24,8 @@ func newMockServer(t *testing.T, authCalls *atomic.Int32, refreshCalls *atomic.I
 			TokenType:        "bearer",
 			AccessToken:      "test-access-token",
 			RefreshToken:     "test-refresh-token",
-			ExpiresIn:        int(time.Now().Add(24 * time.Hour).Unix()),
-			RefreshExpiresIn: int(time.Now().Add(48 * time.Hour).Unix()),
+			ExpiresIn:        time.Now().Add(24 * time.Hour).Unix(),
+			RefreshExpiresIn: time.Now().Add(48 * time.Hour).Unix(),
 			Scope:            "get_token",
 			SessionState:     "test",
 		}
@@ -97,7 +97,7 @@ func TestTokenExpired_ReauthCalled(t *testing.T) {
 
 	// Force token expiry
 	q.mu.Lock()
-	q.loginObject.ExpiresIn = int(time.Now().Add(-1 * time.Hour).Unix())
+	q.loginObject.ExpiresIn = time.Now().Add(-1 * time.Hour).Unix()
 	q.mu.Unlock()
 
 	// Should use refresh token (refresh_expires_in is still valid)
@@ -125,8 +125,8 @@ func TestRefreshExpired_FullAuthFallback(t *testing.T) {
 
 	// Force both tokens expired
 	q.mu.Lock()
-	q.loginObject.ExpiresIn = int(time.Now().Add(-1 * time.Hour).Unix())
-	q.loginObject.RefreshExpiresIn = int(time.Now().Add(-1 * time.Hour).Unix())
+	q.loginObject.ExpiresIn = time.Now().Add(-1 * time.Hour).Unix()
+	q.loginObject.RefreshExpiresIn = time.Now().Add(-1 * time.Hour).Unix()
 	q.mu.Unlock()
 
 	// Should fallback to full auth
@@ -149,8 +149,8 @@ func TestRefreshFails_FallsBackToFullAuth(t *testing.T) {
 			TokenType:        "bearer",
 			AccessToken:      "test-access-token",
 			RefreshToken:     "test-refresh-token",
-			ExpiresIn:        int(time.Now().Add(24 * time.Hour).Unix()),
-			RefreshExpiresIn: int(time.Now().Add(48 * time.Hour).Unix()),
+			ExpiresIn:        time.Now().Add(24 * time.Hour).Unix(),
+			RefreshExpiresIn: time.Now().Add(48 * time.Hour).Unix(),
 			Scope:            "get_token",
 		}
 		switch r.URL.Path {
@@ -176,7 +176,7 @@ func TestRefreshFails_FallsBackToFullAuth(t *testing.T) {
 
 	// Force access token expiry (refresh token still valid)
 	q.mu.Lock()
-	q.loginObject.ExpiresIn = int(time.Now().Add(-1 * time.Hour).Unix())
+	q.loginObject.ExpiresIn = time.Now().Add(-1 * time.Hour).Unix()
 	q.mu.Unlock()
 
 	// Refresh will fail → should fallback to full auth
@@ -199,8 +199,8 @@ func TestSingleflight_ConcurrentCallsMakeOneRequest(t *testing.T) {
 			TokenType:        "bearer",
 			AccessToken:      "test-access-token",
 			RefreshToken:     "test-refresh-token",
-			ExpiresIn:        int(time.Now().Add(24 * time.Hour).Unix()),
-			RefreshExpiresIn: int(time.Now().Add(48 * time.Hour).Unix()),
+			ExpiresIn:        time.Now().Add(24 * time.Hour).Unix(),
+			RefreshExpiresIn: time.Now().Add(48 * time.Hour).Unix(),
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp)

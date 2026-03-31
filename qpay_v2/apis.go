@@ -156,7 +156,6 @@ func (q *qpay) authQPayV2() (qpayLoginResponse, error) {
 
 		q.mu.Lock()
 		q.loginObject = &res
-		q.loginTime = time.Now()
 		q.mu.Unlock()
 		return res, nil
 	})
@@ -168,12 +167,12 @@ func (q *qpay) authQPayV2() (qpayLoginResponse, error) {
 
 // tokenValid checks if access token is still valid (must hold mu.RLock)
 func (q *qpay) tokenValid() bool {
-	return time.Now().Before(time.Unix(int64(q.loginObject.ExpiresIn), 0).Add(-1 * time.Minute))
+	return time.Now().Before(time.Unix(q.loginObject.ExpiresIn, 0).Add(-1 * time.Minute))
 }
 
 // refreshTokenValid checks if refresh token is still valid (must hold mu.RLock)
 func (q *qpay) refreshTokenValid() bool {
-	return time.Now().Before(time.Unix(int64(q.loginObject.RefreshExpiresIn), 0).Add(-1 * time.Minute))
+	return time.Now().Before(time.Unix(q.loginObject.RefreshExpiresIn, 0).Add(-1 * time.Minute))
 }
 
 // doAuth [Full auth: username/password]
