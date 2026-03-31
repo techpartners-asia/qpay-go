@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/sync/singleflight"
 	"resty.dev/v3"
 )
 
@@ -22,7 +23,7 @@ type qpay struct {
 	loginObject *qpayLoginResponse
 	loginTime   time.Time
 	mu          sync.RWMutex
-	refreshMu   sync.Mutex // Serializes re-auth calls when mu is unlocked
+	authGroup   singleflight.Group // Coalesces concurrent auth calls into one
 	client      *resty.Client
 }
 

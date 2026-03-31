@@ -112,9 +112,10 @@ func (q *qpay) httpRequestQPay(body interface{}, result interface{}, api utils.A
 // Энэ функц нь токен дуусах хугацааг шалгаж, шаардлагатай бол автоматаар шинэчилнэ.
 // Access token хугацаа дуусвал refresh token ашиглан шинэчилнэ.
 // Refresh token хугацаа дуусвал бүрэн дахин нэвтэрнэ.
+// Uses singleflight: 50 concurrent calls = 1 network request, all 50 get the same result.
 // See: https://developer.qpay.mn/#auth-token
 func (q *qpay) authQPayV2() (authRes qpayLoginResponse, err error) {
-	// 1. Fast path: Read-lock check — access token still valid
+	// Fast path: access token still valid
 	q.mu.RLock()
 	if q.loginObject != nil {
 		expiryTime := time.Unix(int64(q.loginObject.ExpiresIn), 0)
@@ -126,53 +127,58 @@ func (q *qpay) authQPayV2() (authRes qpayLoginResponse, err error) {
 	}
 	q.mu.RUnlock()
 
-	// 2. Slow path: Acquire refresh lock (serializes the network call)
-	q.refreshMu.Lock()
-	defer q.refreshMu.Unlock()
-
-	// 3. Double-check after acquiring refreshMu
-	q.mu.RLock()
-	if q.loginObject != nil {
-		expiryTime := time.Unix(int64(q.loginObject.ExpiresIn), 0)
-		if time.Now().Before(expiryTime.Add(-1 * time.Minute)) {
-			authRes = *q.loginObject
-			q.mu.RUnlock()
-			return authRes, nil
+	// Slow path: singleflight ensures only one auth call at a time.
+	// All concurrent callers share the same result.
+	v, err, _ := q.authGroup.Do("auth", func() (interface{}, error) {
+		// Double-check: another goroutine may have refreshed while we waited
+		q.mu.RLock()
+		if q.loginObject != nil {
+			expiryTime := time.Unix(int64(q.loginObject.ExpiresIn), 0)
+			if time.Now().Before(expiryTime.Add(-1 * time.Minute)) {
+				res := *q.loginObject
+				q.mu.RUnlock()
+				return res, nil
+			}
 		}
-	}
-	q.mu.RUnlock()
+		q.mu.RUnlock()
 
-	// 4. Determine whether to use refresh token or full auth
-	q.mu.RLock()
-	canRefresh := false
-	var refreshToken string
-	if q.loginObject != nil && q.loginObject.RefreshToken != "" {
-		refreshExpiry := time.Unix(int64(q.loginObject.RefreshExpiresIn), 0)
-		if time.Now().Before(refreshExpiry.Add(-1 * time.Minute)) {
-			canRefresh = true
-			refreshToken = q.loginObject.RefreshToken
+		// Determine whether to use refresh token or full auth
+		q.mu.RLock()
+		canRefresh := false
+		var refreshToken string
+		if q.loginObject != nil && q.loginObject.RefreshToken != "" {
+			refreshExpiry := time.Unix(int64(q.loginObject.RefreshExpiresIn), 0)
+			if time.Now().Before(refreshExpiry.Add(-1 * time.Minute)) {
+				canRefresh = true
+				refreshToken = q.loginObject.RefreshToken
+			}
 		}
-	}
-	q.mu.RUnlock()
+		q.mu.RUnlock()
 
-	if canRefresh {
-		// 4a. Use refresh token — lightweight, no username/password needed
-		authRes, err = q.refreshAccessToken(refreshToken)
-	} else {
-		// 4b. Full auth — first login or refresh token expired
-		authRes, err = q.fullAuth()
-	}
+		var res qpayLoginResponse
+		var authErr error
+		if canRefresh {
+			res, authErr = q.refreshAccessToken(refreshToken)
+		} else {
+			res, authErr = q.fullAuth()
+		}
+		if authErr != nil {
+			return res, authErr
+		}
+
+		// Update shared state
+		q.mu.Lock()
+		q.loginObject = &res
+		q.loginTime = time.Now()
+		q.mu.Unlock()
+
+		return res, nil
+	})
 	if err != nil {
 		return authRes, err
 	}
 
-	// 5. Update shared state under Write-lock
-	q.mu.Lock()
-	q.loginObject = &authRes
-	q.loginTime = time.Now()
-	q.mu.Unlock()
-
-	return authRes, nil
+	return v.(qpayLoginResponse), nil
 }
 
 // refreshAccessToken [Internal: Refresh token ашиглан access token шинэчлэх]
