@@ -108,12 +108,20 @@ func New(username, password, endpoint, callback, invoiceCode, merchantId string,
 	}
 
 	if q.syncAuth {
-		// Block until auth completes — caller knows immediately if auth fails.
-		q.authQPayV2() //nolint:errcheck
+		// Block until auth completes with retry.
+		// If QPay is temporarily unreachable, retry up to 3 times
+		// with a 1-second delay between attempts.
+		for i := 0; i < 3; i++ {
+			if _, err := q.authQPayV2(); err == nil {
+				break
+			}
+			if i < 2 {
+				time.Sleep(1 * time.Second)
+			}
+		}
 	} else {
 		// Attempt login in background to warm the token cache.
-		// If it fails (network down or bad config), authQPayV2 will retry
-		// transparently on the first real API call.
+		// If it fails, authQPayV2 will retry on the first API call.
 		go q.authQPayV2() //nolint:errcheck
 	}
 
@@ -264,11 +272,7 @@ func (q *qpay) RefundPayment(invoiceId, paymentId string) (QpayGeneralResponse, 
 	return response, nil
 }
 
-// newTransport creates an http.Transport tuned for high-concurrency use.
-// The default Go transport allows only MaxIdleConnsPerHost=2, which forces
-// most concurrent requests to open new connections. Combined with QPay's
-// server closing idle connections aggressively, this causes EOF errors
-// when the client reuses a connection the server has already torn down.
+// newTransport creates an http.Transport with sensible defaults.
 func newTransport() *http.Transport {
 	return &http.Transport{
 		DialContext: (&net.Dialer{
@@ -277,8 +281,8 @@ func newTransport() *http.Transport {
 		}).DialContext,
 		TLSClientConfig:      &tls.Config{MinVersion: tls.VersionTLS12},
 		MaxIdleConns:          100,
-		MaxIdleConnsPerHost:   20,
-		MaxConnsPerHost:       50,
+		MaxIdleConnsPerHost:   10,
+		MaxConnsPerHost:       20,
 		IdleConnTimeout:       30 * time.Second,
 		TLSHandshakeTimeout:  10 * time.Second,
 		ResponseHeaderTimeout: 30 * time.Second,
