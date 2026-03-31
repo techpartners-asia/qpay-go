@@ -131,6 +131,8 @@ func (q *qpay) authQPayV2() (authRes qpayLoginResponse, err error) {
 	// All concurrent callers share the same result.
 	v, err, _ := q.authGroup.Do("auth", func() (interface{}, error) {
 		// Double-check: another goroutine may have refreshed while we waited
+		canRefresh := false
+		var refreshToken string
 		q.mu.RLock()
 		if q.loginObject != nil {
 			expiryTime := time.Unix(int64(q.loginObject.ExpiresIn), 0)
@@ -139,18 +141,13 @@ func (q *qpay) authQPayV2() (authRes qpayLoginResponse, err error) {
 				q.mu.RUnlock()
 				return res, nil
 			}
-		}
-		q.mu.RUnlock()
-
-		// Determine whether to use refresh token or full auth
-		q.mu.RLock()
-		canRefresh := false
-		var refreshToken string
-		if q.loginObject != nil && q.loginObject.RefreshToken != "" {
-			refreshExpiry := time.Unix(int64(q.loginObject.RefreshExpiresIn), 0)
-			if time.Now().Before(refreshExpiry.Add(-1 * time.Minute)) {
-				canRefresh = true
-				refreshToken = q.loginObject.RefreshToken
+			// Token expired — check if we can use refresh token
+			if q.loginObject.RefreshToken != "" {
+				refreshExpiry := time.Unix(int64(q.loginObject.RefreshExpiresIn), 0)
+				if time.Now().Before(refreshExpiry.Add(-1 * time.Minute)) {
+					canRefresh = true
+					refreshToken = q.loginObject.RefreshToken
+				}
 			}
 		}
 		q.mu.RUnlock()
