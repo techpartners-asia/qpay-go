@@ -344,24 +344,6 @@ type (
 	// QpayTransaction [Гүйлгээний бүртгэл]
 	// See: https://developer.qpay.mn/#payment-get
 	QpayTransaction struct {
-		BankCode            string `json:"bank_code"`            // Банкны код
-		TransactionID       string `json:"transaction_id"`       // QPay гүйлгээний дугаар
-		TransactionNo       string `json:"transaction_no"`       // Банкны гүйлгээний дугаар
-		TransactionDate     string `json:"transaction_date"`     // Гүйлгээ хийгдсэн огноо
-		TransactionAmount   string `json:"transaction_amount"`   // Гүйлгээний дүн
-		TransactionCurrency string `json:"transaction_currency"` // Валют
-		AccountName         string `json:"account_name"`         // Дансны нэр
-		AccountNumber       string `json:"account_number"`       // Дансны дугаар
-		AccountBankCode     string `json:"account_bank_code"`    // Дансны банкны код
-		Description         string `json:"description"`          // Гүйлгээний утга
-		Status              string `json:"status"`               // Төлөв
-		PaymentID           string `json:"payment_id"`           // Төлбөрийн ID
-		SettlementStatus    string `json:"settlement_status"`    // Тооцоо нийлсэн төлөв
-	}
-
-	// QpayPaymentGetResponse [Payment ID-аар авах төлбөрийн мэдээлэл]
-	// See: https://developer.qpay.mn/#payment-get
-	QpayPaymentGetResponse struct {
 		PaymentID           string                         `json:"payment_id"`
 		PaymentStatus       string                         `json:"payment_status"`
 		PaymentFee          string                         `json:"payment_fee"`
@@ -376,7 +358,22 @@ type (
 		TransactionType     string                         `json:"transaction_type"`
 		CardTransactions    []*QpayCardTransactionResponse `json:"card_transactions"`
 		P2PTransactions     []*QpayP2PTransactionResponse  `json:"p2p_transactions"`
+		BankCode            string                         `json:"bank_code"`            // Банкны код
+		TransactionID       string                         `json:"transaction_id"`       // QPay гүйлгээний дугаар
+		TransactionNo       string                         `json:"transaction_no"`       // Банкны гүйлгээний дугаар
+		TransactionDate     string                         `json:"transaction_date"`     // Гүйлгээ хийгдсэн огноо
+		TransactionAmount   string                         `json:"transaction_amount"`   // Гүйлгээний дүн
+		TransactionCurrency string                         `json:"transaction_currency"` // Валют
+		AccountName         string                         `json:"account_name"`         // Дансны нэр
+		AccountNumber       string                         `json:"account_number"`       // Дансны дугаар
+		AccountBankCode     string                         `json:"account_bank_code"`    // Дансны банкны код
+		Description         string                         `json:"description"`          // Гүйлгээний утга
+		Status              string                         `json:"status"`               // Төлөв
+		SettlementStatus    string                         `json:"settlement_status"`    // Тооцоо нийлсэн төлөв
 	}
+
+	// QpayPaymentGetResponse is kept as a semantic alias for payment/get responses.
+	QpayPaymentGetResponse = QpayTransaction
 
 	// QpayCardTransactionResponse [Картын гүйлгээний мэдээлэл]
 	QpayCardTransactionResponse struct {

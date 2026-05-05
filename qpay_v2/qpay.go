@@ -46,7 +46,7 @@ type QPay interface {
 
 	// GetPayment [Төлбөрийн мэдээлэл татах]
 	// See: https://developer.qpay.mn/#payment-Get
-	GetPayment(paymentId string) (QpayPaymentGetResponse, error)
+	GetPayment(paymentId string) (QpayTransaction, error)
 
 	// CheckPayment [Төлбөр төлөгдсөн эсэхийг шалгах]
 	// See: https://developer.qpay.mn/#payment-check
@@ -274,11 +274,11 @@ func (q *qpay) CancelInvoice(invoiceId string) (QpayGeneralResponse, error) {
 }
 
 // GetPayment [Төлбөрийн мэдээлэл татах]
-func (q *qpay) GetPayment(paymentId string) (QpayPaymentGetResponse, error) {
-	var response QpayPaymentGetResponse
+func (q *qpay) GetPayment(paymentId string) (QpayTransaction, error) {
+	var response QpayTransaction
 	err := q.httpRequestQPay(nil, &response, QPayPaymentGet, paymentId)
 	if err != nil {
-		return QpayPaymentGetResponse{}, err
+		return QpayTransaction{}, err
 	}
 
 	return response, nil
