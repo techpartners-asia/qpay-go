@@ -33,6 +33,9 @@ type QPay interface {
 	// See: https://developer.qpay.mn/#invoice-Create
 	CreateInvoice(input QPayCreateInvoiceInput) (QPaySimpleInvoiceResponse, error)
 
+	// CreateEbarimtInvoice [И-баримт 3.0 мэдээлэлтэй нэхэмжлэх үүсгэх]
+	CreateEbarimtInvoice(input QPayCreateEbarimtInvoiceInput) (QPaySimpleInvoiceResponse, error)
+
 	// GetInvoice [Үүсгэсэн нэхэмжлэлийн мэдээлэл харах]
 	// See: https://developer.qpay.mn/#invoice-Get
 	GetInvoice(invoiceId string) (QpayInvoiceGetResponse, error)
@@ -43,7 +46,7 @@ type QPay interface {
 
 	// GetPayment [Төлбөрийн мэдээлэл татах]
 	// See: https://developer.qpay.mn/#payment-Get
-	GetPayment(paymentId string) (QpayTransaction, error)
+	GetPayment(paymentId string) (QpayPaymentGetResponse, error)
 
 	// CheckPayment [Төлбөр төлөгдсөн эсэхийг шалгах]
 	// See: https://developer.qpay.mn/#payment-check
@@ -60,6 +63,12 @@ type QPay interface {
 	// GetPaymentList [Төлбөрийн жагсаалт авах]
 	// See: https://developer.qpay.mn/#payment-list
 	GetPaymentList(input QPayPaymentListInput) (QpayPaymentListResponse, error)
+
+	// CreateEbarimt [Төлбөр төлөгдсөний дараа и-баримт 3.0 үүсгэх]
+	CreateEbarimt(input QPayEbarimtCreateInput) (QPayEbarimtResponse, error)
+
+	// CancelEbarimt [И-баримт 3.0 цуцлах]
+	CancelEbarimt(paymentId string) (QPayEbarimtResponse, error)
 }
 
 // Option defines an option for qpay initialization.
@@ -187,6 +196,61 @@ func (q *qpay) CreateInvoice(input QPayCreateInvoiceInput) (QPaySimpleInvoiceRes
 	return response, nil
 }
 
+// CreateEbarimtInvoice [И-баримт 3.0 мэдээлэлтэй нэхэмжлэх үүсгэх]
+func (q *qpay) CreateEbarimtInvoice(input QPayCreateEbarimtInvoiceInput) (QPaySimpleInvoiceResponse, error) {
+	request := q.newEbarimtInvoiceRequest(input)
+
+	var response QPaySimpleInvoiceResponse
+	err := q.httpRequestQPay(request, &response, QPayInvoiceCreate, "")
+	if err != nil {
+		return QPaySimpleInvoiceResponse{}, err
+	}
+
+	return response, nil
+}
+
+func (q *qpay) newEbarimtInvoiceRequest(input QPayCreateEbarimtInvoiceInput) QPayEbarimtInvoiceRequest {
+	vals := url.Values{}
+	for k, v := range input.CallbackParam {
+		vals.Add(k, v)
+	}
+
+	callbackURL := input.CallbackURL
+	if callbackURL == "" {
+		callbackURL = q.callback
+	}
+	if len(vals) > 0 {
+		callbackURL = fmt.Sprintf("%s?%s", callbackURL, vals.Encode())
+	}
+
+	invoiceCode := input.InvoiceCode
+	if invoiceCode == "" {
+		invoiceCode = q.invoiceCode
+	}
+
+	calculateVat := input.CalculateVat
+	if calculateVat == nil && (input.TaxType == QPayTaxTypeNoVAT || input.TaxType == QPayTaxTypeVATExempt) {
+		value := false
+		calculateVat = &value
+	}
+
+	return QPayEbarimtInvoiceRequest{
+		InvoiceCode:         invoiceCode,
+		SenderInvoiceNo:     input.SenderInvoiceNo,
+		SenderBranchCode:    input.SenderBranchCode,
+		SenderStaffCode:     input.SenderStaffCode,
+		SenderStaffData:     input.SenderStaffData,
+		InvoiceReceiverCode: input.InvoiceReceiverCode,
+		InvoiceReceiverData: input.InvoiceReceiverData,
+		InvoiceDescription:  input.InvoiceDescription,
+		TaxType:             input.TaxType,
+		DistrictCode:        input.DistrictCode,
+		CallbackUrl:         callbackURL,
+		CalculateVat:        calculateVat,
+		Lines:               input.Lines,
+	}
+}
+
 // GetInvoice [Нэхэмжлэхийн мэдээлэл авах]
 func (q *qpay) GetInvoice(invoiceId string) (QpayInvoiceGetResponse, error) {
 	var response QpayInvoiceGetResponse
@@ -210,11 +274,11 @@ func (q *qpay) CancelInvoice(invoiceId string) (QpayGeneralResponse, error) {
 }
 
 // GetPayment [Төлбөрийн мэдээлэл татах]
-func (q *qpay) GetPayment(paymentId string) (QpayTransaction, error) {
-	var response QpayTransaction
+func (q *qpay) GetPayment(paymentId string) (QpayPaymentGetResponse, error) {
+	var response QpayPaymentGetResponse
 	err := q.httpRequestQPay(nil, &response, QPayPaymentGet, paymentId)
 	if err != nil {
-		return QpayTransaction{}, err
+		return QpayPaymentGetResponse{}, err
 	}
 
 	return response, nil
@@ -279,12 +343,12 @@ func newTransport() *http.Transport {
 			Timeout:   10 * time.Second,
 			KeepAlive: 30 * time.Second,
 		}).DialContext,
-		TLSClientConfig:      &tls.Config{MinVersion: tls.VersionTLS12},
+		TLSClientConfig:       &tls.Config{MinVersion: tls.VersionTLS12},
 		MaxIdleConns:          100,
 		MaxIdleConnsPerHost:   10,
 		MaxConnsPerHost:       20,
 		IdleConnTimeout:       30 * time.Second,
-		TLSHandshakeTimeout:  10 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
 		ResponseHeaderTimeout: 30 * time.Second,
 		ForceAttemptHTTP2:     true,
 	}
@@ -320,6 +384,36 @@ func (q *qpay) GetPaymentList(input QPayPaymentListInput) (QpayPaymentListRespon
 	err := q.httpRequestQPay(req, &response, QPayPaymentList, "")
 	if err != nil {
 		return QpayPaymentListResponse{}, err
+	}
+
+	return response, nil
+}
+
+// CreateEbarimt [Төлбөр төлөгдсөний дараа и-баримт 3.0 үүсгэх]
+func (q *qpay) CreateEbarimt(input QPayEbarimtCreateInput) (QPayEbarimtResponse, error) {
+	request := QPayEbarimtCreateRequest{
+		PaymentID:           input.PaymentID,
+		EbarimtReceiverType: input.EbarimtReceiverType,
+		EbarimtReceiver:     input.EbarimtReceiver,
+		DistrictCode:        input.DistrictCode,
+		ClassificationCode:  input.ClassificationCode,
+	}
+
+	var response QPayEbarimtResponse
+	err := q.httpRequestQPay(request, &response, QPayEbarimtCreate, "")
+	if err != nil {
+		return QPayEbarimtResponse{}, err
+	}
+
+	return response, nil
+}
+
+// CancelEbarimt [И-баримт 3.0 цуцлах]
+func (q *qpay) CancelEbarimt(paymentId string) (QPayEbarimtResponse, error) {
+	var response QPayEbarimtResponse
+	err := q.httpRequestQPay(nil, &response, QPayEbarimtCancel, paymentId)
+	if err != nil {
+		return QPayEbarimtResponse{}, err
 	}
 
 	return response, nil

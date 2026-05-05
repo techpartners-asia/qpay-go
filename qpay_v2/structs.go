@@ -1,15 +1,43 @@
 package qpay_v2
 
 type (
+	// QPayEbarimtReceiverType [И-баримт хүлээн авагчийн төрөл]
+	QPayEbarimtReceiverType string
+	// QPayTaxType [И-баримтын татварын төрөл]
+	QPayTaxType string
+	// QPayTaxCode [И-баримтын татварын мөрийн код]
+	QPayTaxCode string
+)
+
+const (
+	// QPayEbarimtReceiverCitizen [И-баримт иргэнээр авах]
+	QPayEbarimtReceiverCitizen QPayEbarimtReceiverType = "CITIZEN"
+	// QPayEbarimtReceiverCompany [И-баримт байгууллагаар авах]
+	QPayEbarimtReceiverCompany QPayEbarimtReceiverType = "COMPANY"
+
+	// QPayTaxTypeVAT [НӨАТ тооцогдох бүтээгдэхүүн]
+	QPayTaxTypeVAT QPayTaxType = "1"
+	// QPayTaxTypeNoVAT [НӨАТ-гүй бүтээгдэхүүн]
+	QPayTaxTypeNoVAT QPayTaxType = "2"
+	// QPayTaxTypeVATExempt [НӨАТ-аас чөлөөлөгдөх бүтээгдэхүүн]
+	QPayTaxTypeVATExempt QPayTaxType = "3"
+
+	// QPayTaxCodeVAT [НӨАТ]
+	QPayTaxCodeVAT QPayTaxCode = "VAT"
+	// QPayTaxCodeCity [Нийслэл хотын албан татвар]
+	QPayTaxCodeCity QPayTaxCode = "CITY_TAX"
+)
+
+type (
 	// qpayLoginResponse [Нэвтрэх хариу]
 	// See: https://developer.qpay.mn/#auth-token
 	qpayLoginResponse struct {
 		TokenType        string `json:"token_type"`         // Токены төрөл (Bearer)
-		RefreshToken     string `json:"refresh_token"`       // Шинэчлэх токен
+		RefreshToken     string `json:"refresh_token"`      // Шинэчлэх токен
 		RefreshExpiresIn int64  `json:"refresh_expires_in"` // Шинэчлэх токены хүчинтэй хугацаа (Unix timestamp)
 		AccessToken      string `json:"access_token"`       // Хандалтын токен
 		ExpiresIn        int64  `json:"expires_in"`         // Хандалтын токены хүчинтэй хугацаа (Unix timestamp)
-		Scope            string `json:"scope"`               // Хандах хүрээ
+		Scope            string `json:"scope"`              // Хандах хүрээ
 		NotBeforePolicy  string `json:"not-before-policy"`  // Бодлого
 		SessionState     string `json:"session_state"`      // Сессийн төлөв
 	}
@@ -17,31 +45,105 @@ type (
 	// QPayCreateInvoiceInput [Нэхэмжлэх үүсгэх оролтын өгөгдөл]
 	// SDK-ийн CreateInvoice функцэд дамжуулах бүтэц.
 	QPayCreateInvoiceInput struct {
-		SenderInvoiceNo      string                    // Байгууллагаас үүсгэх давтагдашгүй нэхэмжлэлийн дугаар (sender_invoice_no)
-		SenderBranchCode     string                    // Байгууллагын салбарын код
-		SenderBranchData     *SenderBranchData         // Салбарын мэдээлэл (заавал биш)
-		SenderTerminalCode   string                    // Терминалын код
-		SenderTerminalData   *SenderTerminalData       // Терминалын мэдээлэл (заавал биш)
-		SenderStaffCode      string                    // Ажилтны код
-		SenderStaffData      *SenderStaffData          // Ажилтны мэдээлэл (заавал биш)
-		InvoiceReceiverCode  string                    // Хэрэглэгчийн ID/Код (invoice_receiver_code)
-		InvoiceReceiverData  *InvoiceReceiverData      // Хэрэглэгчийн мэдээлэл (заавал биш)
-		InvoiceDescription   string                    // Нэхэмжлэлийн утга/тайлбар (invoice_description)
-		Amount               int64                     // Мөнгөн дүн (бүхэл тоогоор)
-		CallbackParam        map[string]string         // URL-д нэмэгдэх параметрүүд
-		Note                 string                    // Тэмдэглэл (заавал биш)
-		Lines                []*QpayLineRequest        // Нэхэмжлэлийн мөрүүд (заавал биш)
-		InvoiceDueDate       string                    // Төлөх эцсийн хугацаа (YYYY-MM-DD HH:mm:ss)
-		ExpiryDate           string                    // Дуусах хугацаа (YYYY-MM-DD HH:mm:ss)
-		EnableExpiry         bool                      // Дуусах хугацаа ашиглах эсэх
-		AllowPartial         bool                      // Хувааж төлөх зөвшөөрөх
-		MinimumAmount        int64                     // Хамгийн бага төлөх дүн
-		AllowExceed          bool                      // Илүү төлөлт зөвшөөрөх
-		MaximumAmount        int64                     // Хамгийн их төлөх дүн
-		CalculateVat         bool                      // НӨАТ тооцох эсэх
-		TaxCustomerCode      string                    // ИБаримт үүсгүүлэх байгууллага/хэрэглэгчийн регистр
-		LineTaxCode          string                    // БТҮК код (Мөр хоосон үед ашиглана)
-		Transactions         []*QpayTransactionRequest // Гүйлгээний мэдээлэл (Данс тохируулах)
+		SenderInvoiceNo     string                    // Байгууллагаас үүсгэх давтагдашгүй нэхэмжлэлийн дугаар (sender_invoice_no)
+		SenderBranchCode    string                    // Байгууллагын салбарын код
+		SenderBranchData    *SenderBranchData         // Салбарын мэдээлэл (заавал биш)
+		SenderTerminalCode  string                    // Терминалын код
+		SenderTerminalData  *SenderTerminalData       // Терминалын мэдээлэл (заавал биш)
+		SenderStaffCode     string                    // Ажилтны код
+		SenderStaffData     *SenderStaffData          // Ажилтны мэдээлэл (заавал биш)
+		InvoiceReceiverCode string                    // Хэрэглэгчийн ID/Код (invoice_receiver_code)
+		InvoiceReceiverData *InvoiceReceiverData      // Хэрэглэгчийн мэдээлэл (заавал биш)
+		InvoiceDescription  string                    // Нэхэмжлэлийн утга/тайлбар (invoice_description)
+		Amount              int64                     // Мөнгөн дүн (бүхэл тоогоор)
+		CallbackParam       map[string]string         // URL-д нэмэгдэх параметрүүд
+		Note                string                    // Тэмдэглэл (заавал биш)
+		Lines               []*QpayLineRequest        // Нэхэмжлэлийн мөрүүд (заавал биш)
+		InvoiceDueDate      string                    // Төлөх эцсийн хугацаа (YYYY-MM-DD HH:mm:ss)
+		ExpiryDate          string                    // Дуусах хугацаа (YYYY-MM-DD HH:mm:ss)
+		EnableExpiry        bool                      // Дуусах хугацаа ашиглах эсэх
+		AllowPartial        bool                      // Хувааж төлөх зөвшөөрөх
+		MinimumAmount       int64                     // Хамгийн бага төлөх дүн
+		AllowExceed         bool                      // Илүү төлөлт зөвшөөрөх
+		MaximumAmount       int64                     // Хамгийн их төлөх дүн
+		CalculateVat        bool                      // НӨАТ тооцох эсэх
+		TaxCustomerCode     string                    // ИБаримт үүсгүүлэх байгууллага/хэрэглэгчийн регистр
+		LineTaxCode         string                    // БТҮК код (Мөр хоосон үед ашиглана)
+		Transactions        []*QpayTransactionRequest // Гүйлгээний мэдээлэл (Данс тохируулах)
+	}
+
+	// QPayCreateEbarimtInvoiceInput [И-баримт 3.0 мэдээлэлтэй нэхэмжлэх үүсгэх оролт]
+	// InvoiceCode хоосон бол New(...) дээр дамжуулсан invoiceCode-ийг ашиглана.
+	QPayCreateEbarimtInvoiceInput struct {
+		InvoiceCode         string
+		SenderInvoiceNo     string
+		SenderBranchCode    string
+		SenderStaffCode     string
+		SenderStaffData     *SenderStaffData
+		InvoiceReceiverCode string
+		InvoiceReceiverData *InvoiceReceiverData
+		InvoiceDescription  string
+		TaxType             QPayTaxType
+		DistrictCode        string
+		CallbackURL         string
+		CallbackParam       map[string]string
+		CalculateVat        *bool
+		Lines               []*QPayEbarimtInvoiceLine
+	}
+
+	// QPayEbarimtInvoiceRequest [И-баримт 3.0 мэдээлэлтэй нэхэмжлэх үүсгэх хүсэлт]
+	QPayEbarimtInvoiceRequest struct {
+		InvoiceCode         string                    `json:"invoice_code"`
+		SenderInvoiceNo     string                    `json:"sender_invoice_no"`
+		SenderBranchCode    string                    `json:"sender_branch_code,omitempty"`
+		SenderStaffCode     string                    `json:"sender_staff_code,omitempty"`
+		SenderStaffData     *SenderStaffData          `json:"sender_staff_data,omitempty"`
+		InvoiceReceiverCode string                    `json:"invoice_receiver_code"`
+		InvoiceReceiverData *InvoiceReceiverData      `json:"invoice_receiver_data,omitempty"`
+		InvoiceDescription  string                    `json:"invoice_description"`
+		TaxType             QPayTaxType               `json:"tax_type"`
+		DistrictCode        string                    `json:"district_code"`
+		CallbackUrl         string                    `json:"callback_url"`
+		CalculateVat        *bool                     `json:"calculate_vat,omitempty"`
+		Lines               []*QPayEbarimtInvoiceLine `json:"lines"`
+	}
+
+	// QPayEbarimtInvoiceLine [И-баримт 3.0 нэхэмжлэхийн бараа/үйлчилгээний мөр]
+	QPayEbarimtInvoiceLine struct {
+		TaxProductCode     string            `json:"tax_product_code,omitempty"`
+		LineDescription    string            `json:"line_description"`
+		Barcode            string            `json:"barcode,omitempty"`
+		LineQuantity       string            `json:"line_quantity"`
+		LineUnitPrice      string            `json:"line_unit_price"`
+		Note               string            `json:"note,omitempty"`
+		ClassificationCode string            `json:"classification_code,omitempty"`
+		Taxes              []*QPayEbarimtTax `json:"taxes,omitempty"`
+	}
+
+	// QPayEbarimtTax [И-баримт 3.0 татварын мөр]
+	QPayEbarimtTax struct {
+		TaxCode     QPayTaxCode `json:"tax_code"`
+		Description string      `json:"description"`
+		Amount      string      `json:"amount"`
+		Note        string      `json:"note,omitempty"`
+	}
+
+	// QPayEbarimtCreateInput [Төлбөр төлөгдсөний дараа и-баримт үүсгэх оролт]
+	QPayEbarimtCreateInput struct {
+		PaymentID           string
+		EbarimtReceiverType QPayEbarimtReceiverType
+		EbarimtReceiver     string
+		DistrictCode        string
+		ClassificationCode  string
+	}
+
+	// QPayEbarimtCreateRequest [Төлбөр төлөгдсөний дараа и-баримт үүсгэх хүсэлт]
+	QPayEbarimtCreateRequest struct {
+		PaymentID           string                  `json:"payment_id"`
+		EbarimtReceiverType QPayEbarimtReceiverType `json:"ebarimt_receiver_type"`
+		EbarimtReceiver     string                  `json:"ebarimt_receiver,omitempty"`
+		DistrictCode        string                  `json:"district_code,omitempty"`
+		ClassificationCode  string                  `json:"classification_code,omitempty"`
 	}
 
 	// QpayAddress [Хаягийн мэдээлэл]
@@ -89,27 +191,27 @@ type (
 
 	// QpayAdjustmentDiscount [Хөнгөлөлт]
 	QpayAdjustmentDiscount struct {
-		Code        string `json:"discount_code"` // Код
-		Description string `json:"description"`   // Тайлбар
-		Amount      int64  `json:"amount"`        // Мөнгөн дүн
+		Code        string `json:"discount_code"`  // Код
+		Description string `json:"description"`    // Тайлбар
+		Amount      int64  `json:"amount"`         // Мөнгөн дүн
 		Note        string `json:"note,omitempty"` // Тэмдэглэл
 	}
 
 	// QpayAdjustmentSurcharge [Нэмэгдэл]
 	QpayAdjustmentSurcharge struct {
 		Code        string `json:"surcharge_code"` // Код
-		Description string `json:"description"`     // Тайлбар
-		Amount      int64  `json:"amount"`          // Мөнгөн дүн
-		Note        string `json:"note,omitempty"`   // Тэмдэглэл
+		Description string `json:"description"`    // Тайлбар
+		Amount      int64  `json:"amount"`         // Мөнгөн дүн
+		Note        string `json:"note,omitempty"` // Тэмдэглэл
 	}
 
 	// QpayAdjustmentTax [Татвар]
 	QpayAdjustmentTax struct {
 		Code        string `json:"tax_code"`           // Код (CITY_TAX, VAT)
-		Description string `json:"description"`         // Тайлбар
-		Amount      int64  `json:"amount"`              // Мөнгөн дүн
-		CityTax     int64  `json:"city_tax,omitempty"`  // Хотын татвар
-		Note        string `json:"note,omitempty"`       // Тэмдэглэл
+		Description string `json:"description"`        // Тайлбар
+		Amount      int64  `json:"amount"`             // Мөнгөн дүн
+		CityTax     int64  `json:"city_tax,omitempty"` // Хотын татвар
+		Note        string `json:"note,omitempty"`     // Тэмдэглэл
 	}
 
 	// QpayLineRequest [Нэхэмжлэлийн мөр - Хүсэлт илгээхэд ашиглана]
@@ -136,8 +238,8 @@ type (
 
 	// QpayTransactionRequest [Гүйлгээний мэдээлэл (Хүсэлт)]
 	QpayTransactionRequest struct {
-		Description string                `json:"description"`       // Гүйлгээний утга
-		Amount      int64                 `json:"amount"`            // Мөнгөн дүн
+		Description string                `json:"description"`        // Гүйлгээний утга
+		Amount      int64                 `json:"amount"`             // Мөнгөн дүн
 		Accounts    []*QpayAccountRequest `json:"accounts,omitempty"` // Банкны данснууд
 	}
 
@@ -147,7 +249,7 @@ type (
 		TaxProductCode  string                     `json:"tax_product_code"` // Татварын барааны код
 		LineDescription string                     `json:"line_description"` // Мөрийн тайлбар
 		LineQuantity    string                     `json:"line_quantity"`    // Тоо ширхэг (Текст)
-		LineUnitPrice   string                     `json:"line_unit_price"`   // Нэгж үнэ (Текст)
+		LineUnitPrice   string                     `json:"line_unit_price"`  // Нэгж үнэ (Текст)
 		Note            string                     `json:"note"`             // Тэмдэглэл
 		Discounts       []*QpayAdjustmentDiscount  `json:"discounts"`        // Хөнгөлөлтүүд
 		Surcharges      []*QpayAdjustmentSurcharge `json:"surcharges"`       // Нэмэгдлүүд
@@ -165,18 +267,18 @@ type (
 		SenderTerminalData  *SenderTerminalData       `json:"sender_terminal_data,omitempty"`  // Терминалын мэдээлэл
 		SenderStaffCode     string                    `json:"sender_staff_code,omitempty"`     // Ажилтны код
 		SenderStaffData     *SenderStaffData          `json:"sender_staff_data,omitempty"`     // Ажилтны мэдээлэл
-		InvoiceReceiverCode string                    `json:"invoice_receiver_code,omitempty"`  // Хэрэглэгчийн ID/Код
+		InvoiceReceiverCode string                    `json:"invoice_receiver_code,omitempty"` // Хэрэглэгчийн ID/Код
 		InvoiceReceiverData *InvoiceReceiverData      `json:"invoice_receiver_data,omitempty"` // Хэрэглэгчийн мэдээлэл
 		InvoiceDescription  string                    `json:"invoice_description"`             // Нэхэмжлэлийн утга
 		Amount              int64                     `json:"amount"`                          // Нийт дүн
 		CallbackUrl         string                    `json:"callback_url"`                    // Хариу авах URL
-		InvoiceDueDate      string                    `json:"invoice_due_date,omitempty"`       // Хүчинтэй хугацаа
+		InvoiceDueDate      string                    `json:"invoice_due_date,omitempty"`      // Хүчинтэй хугацаа
 		ExpiryDate          string                    `json:"expiry_date,omitempty"`           // Дуусах хугацаа
 		EnableExpiry        bool                      `json:"enable_expiry"`                   // Дуусах хугацаа ашиглах
 		AllowPartial        bool                      `json:"allow_partial"`                   // Хувааж төлөх
-		MinimumAmount       *int64                    `json:"minimum_amount,omitempty"`         // Хамгийн бага төлөх дүн
+		MinimumAmount       *int64                    `json:"minimum_amount,omitempty"`        // Хамгийн бага төлөх дүн
 		AllowExceed         bool                      `json:"allow_exceed"`                    // Илүү төлөлт
-		MaximumAmount       *int64                    `json:"maximum_amount,omitempty"`         // Хамгийн их төлөх дүн
+		MaximumAmount       *int64                    `json:"maximum_amount,omitempty"`        // Хамгийн их төлөх дүн
 		CalculateVat        bool                      `json:"calculate_vat"`                   // НӨАТ тооцох
 		Note                string                    `json:"note,omitempty"`                  // Тэмдэглэл
 		Lines               []*QpayLineRequest        `json:"lines,omitempty"`                 // Нэхэмжлэлийн мөрүүд
@@ -192,7 +294,7 @@ type (
 		QpayShortUrl string      `json:"qPay_shortUrl"` // QR холбоос (Shortcut)
 		QrText       string      `json:"qr_text"`       // QR текст утга
 		QrImage      string      `json:"qr_image"`      // QR зураг (Base64)
-		Urls         []*Deeplink `json:"urls"`           // Банкны аппликейшн линкүүд
+		Urls         []*Deeplink `json:"urls"`          // Банкны аппликейшн линкүүд
 	}
 
 	// Deeplink [Банкны аппликейшн холбоос]
@@ -206,28 +308,28 @@ type (
 	// QpayInvoiceGetResponse [Нэхэмжлэлийн мэдээлэл харах хариу]
 	// See: https://developer.qpay.mn/#invoice-Get
 	QpayInvoiceGetResponse struct {
-		InvoiceID          string             `json:"invoice_id"`          // Нэхэмжлэлийн ID
-		InvoiceStatus      string             `json:"invoice_status"`      // Нэхэмжлэлийн төлөв (OPEN, CLOSED, CANCELLED)
-		SenderInvoiceNo    string             `json:"sender_invoice_no"`   // Байгууллагын нэхэмжлэлийн дугаар
-		InvoiceDescription string             `json:"invoice_description"` // Нэхэмжлэлийн утга
-		GrossAmount        int64              `json:"gross_amount"`        // Үндсэн дүн
-		DiscountAmount     int64              `json:"discount_amount"`     // Хөнгөлөлтийн дүн
-		SurchargeAmount    int64              `json:"surcharge_amount"`    // Нэмэгдлийн дүн
-		TaxAmount          int64              `json:"tax_amount"`          // Татварын дүн
-		TotalAmount        int64              `json:"total_amount"`        // Эцсийн төлөх дүн
-		InvoiceDueDate     string             `json:"invoice_due_date"`    // Дуусах хугацаа
-		ExpiryDate         string             `json:"expiry_date"`         // Хүчингүй болох огноо
-		EnableExpiry       bool               `json:"enable_expiry"`       // Дуусах хугацаа ашиглах
-		AllowPartial       bool               `json:"allow_partial"`       // Хувааж төлөх
-		AllowExceed        bool               `json:"allow_exceed"`        // Илүү төлөлт
-		MinimumAmount      int64              `json:"minimum_amount"`      // Хамгийн бага дүн
-		MaximumAmount      int64              `json:"maximum_amount"`      // Хамгийн их дүн
-		SenderBranchCode   string             `json:"sender_branch_code"`  // Салбарын код
-		CallbackUrl        string             `json:"callback_url"`        // Хариу авах URL
-		Note               string             `json:"note"`                // Тэмдэглэл
+		InvoiceID          string              `json:"invoice_id"`          // Нэхэмжлэлийн ID
+		InvoiceStatus      string              `json:"invoice_status"`      // Нэхэмжлэлийн төлөв (OPEN, CLOSED, CANCELLED)
+		SenderInvoiceNo    string              `json:"sender_invoice_no"`   // Байгууллагын нэхэмжлэлийн дугаар
+		InvoiceDescription string              `json:"invoice_description"` // Нэхэмжлэлийн утга
+		GrossAmount        string              `json:"gross_amount"`        // Үндсэн дүн
+		DiscountAmount     string              `json:"discount_amount"`     // Хөнгөлөлтийн дүн
+		SurchargeAmount    string              `json:"surcharge_amount"`    // Нэмэгдлийн дүн
+		TaxAmount          string              `json:"tax_amount"`          // Татварын дүн
+		TotalAmount        string              `json:"total_amount"`        // Эцсийн төлөх дүн
+		InvoiceDueDate     string              `json:"invoice_due_date"`    // Дуусах хугацаа
+		ExpiryDate         string              `json:"expiry_date"`         // Хүчингүй болох огноо
+		EnableExpiry       bool                `json:"enable_expiry"`       // Дуусах хугацаа ашиглах
+		AllowPartial       bool                `json:"allow_partial"`       // Хувааж төлөх
+		AllowExceed        bool                `json:"allow_exceed"`        // Илүү төлөлт
+		MinimumAmount      string              `json:"minimum_amount"`      // Хамгийн бага дүн
+		MaximumAmount      string              `json:"maximum_amount"`      // Хамгийн их дүн
+		SenderBranchCode   string              `json:"sender_branch_code"`  // Салбарын код
+		CallbackUrl        string              `json:"callback_url"`        // Хариу авах URL
+		Note               string              `json:"note"`                // Тэмдэглэл
 		Lines              []*QpayLineResponse `json:"lines"`               // Мөрүүд (Хариунд текст байдлаар ирдэг)
-		Transactions       []*QpayTransaction `json:"transactions"`        // Гүйлгээнүүд
-		Inputs             []*QpayInput       `json:"inputs"`              // Бусад оролтууд
+		Transactions       []*QpayTransaction  `json:"transactions"`        // Гүйлгээнүүд
+		Inputs             []*QpayInput        `json:"inputs"`              // Бусад оролтууд
 	}
 
 	// QpayInput [Оролтын талбар]
@@ -242,19 +344,69 @@ type (
 	// QpayTransaction [Гүйлгээний бүртгэл]
 	// See: https://developer.qpay.mn/#payment-get
 	QpayTransaction struct {
-		BankCode             string `json:"bank_code"`               // Банкны код
-		TransactionID        string `json:"transaction_id"`          // QPay гүйлгээний дугаар
-		TransactionNo        string `json:"transaction_no"`          // Банкны гүйлгээний дугаар
-		TransactionDate      string `json:"transaction_date"`        // Гүйлгээ хийгдсэн огноо
-		TransactionAmount    string `json:"transaction_amount"`      // Гүйлгээний дүн
-		TransactionCurrency  string `json:"transaction_currency"`    // Валют
-		AccountName          string `json:"account_name"`            // Дансны нэр
-		AccountNumber        string `json:"account_number"`          // Дансны дугаар
-		AccountBankCode      string `json:"account_bank_code"`       // Дансны банкны код
-		Description          string `json:"description"`             // Гүйлгээний утга
-		Status               string `json:"status"`                  // Төлөв
-		PaymentID            string `json:"payment_id"`              // Төлбөрийн ID
-		SettlementStatus     string `json:"settlement_status"`       // Тооцоо нийлсэн төлөв
+		BankCode            string `json:"bank_code"`            // Банкны код
+		TransactionID       string `json:"transaction_id"`       // QPay гүйлгээний дугаар
+		TransactionNo       string `json:"transaction_no"`       // Банкны гүйлгээний дугаар
+		TransactionDate     string `json:"transaction_date"`     // Гүйлгээ хийгдсэн огноо
+		TransactionAmount   string `json:"transaction_amount"`   // Гүйлгээний дүн
+		TransactionCurrency string `json:"transaction_currency"` // Валют
+		AccountName         string `json:"account_name"`         // Дансны нэр
+		AccountNumber       string `json:"account_number"`       // Дансны дугаар
+		AccountBankCode     string `json:"account_bank_code"`    // Дансны банкны код
+		Description         string `json:"description"`          // Гүйлгээний утга
+		Status              string `json:"status"`               // Төлөв
+		PaymentID           string `json:"payment_id"`           // Төлбөрийн ID
+		SettlementStatus    string `json:"settlement_status"`    // Тооцоо нийлсэн төлөв
+	}
+
+	// QpayPaymentGetResponse [Payment ID-аар авах төлбөрийн мэдээлэл]
+	// See: https://developer.qpay.mn/#payment-get
+	QpayPaymentGetResponse struct {
+		PaymentID           string                         `json:"payment_id"`
+		PaymentStatus       string                         `json:"payment_status"`
+		PaymentFee          string                         `json:"payment_fee"`
+		PaymentAmount       string                         `json:"payment_amount"`
+		PaymentCurrency     string                         `json:"payment_currency"`
+		PaymentDate         string                         `json:"payment_date"`
+		PaymentWallet       string                         `json:"payment_wallet"`
+		ObjectType          string                         `json:"object_type"`
+		ObjectID            string                         `json:"object_id"`
+		NextPaymentDate     string                         `json:"next_payment_date"`
+		NextPaymentDatetime string                         `json:"next_payment_datetime"`
+		TransactionType     string                         `json:"transaction_type"`
+		CardTransactions    []*QpayCardTransactionResponse `json:"card_transactions"`
+		P2PTransactions     []*QpayP2PTransactionResponse  `json:"p2p_transactions"`
+	}
+
+	// QpayCardTransactionResponse [Картын гүйлгээний мэдээлэл]
+	QpayCardTransactionResponse struct {
+		CardMerchantCode     string `json:"card_merchant_code"`
+		CardTerminalCode     string `json:"card_terminal_code"`
+		CardNumber           string `json:"card_number"`
+		CardType             string `json:"card_type"`
+		IsCrossBorder        bool   `json:"is_cross_border"`
+		Amount               string `json:"amount"`
+		Currency             string `json:"currency"`
+		Date                 string `json:"date"`
+		Status               string `json:"status"`
+		TransactionAmount    string `json:"transaction_amount"`
+		TransactionCurrency  string `json:"transaction_currency"`
+		TransactionDate      string `json:"transaction_date"`
+		TransactionStatus    string `json:"transaction_status"`
+		SettlementStatus     string `json:"settlement_status"`
+		SettlementStatusDate string `json:"settlement_status_date"`
+	}
+
+	// QpayP2PTransactionResponse [P2P буюу банкны апп гүйлгээний мэдээлэл]
+	QpayP2PTransactionResponse struct {
+		TransactionBankCode string `json:"transaction_bank_code"`
+		AccountBankCode     string `json:"account_bank_code"`
+		AccountBankName     string `json:"account_bank_name"`
+		AccountNumber       string `json:"account_number"`
+		Status              string `json:"status"`
+		Amount              string `json:"amount"`
+		Currency            string `json:"currency"`
+		SettlementStatus    string `json:"settlement_status"`
 	}
 
 	// QpayPaymentCheckRequest [Төлбөр шалгах хүсэлт]
@@ -282,14 +434,20 @@ type (
 	// QpayRow [Гүйлгээний мэдээлэл]
 	// See: https://developer.qpay.mn/#payment-check
 	QpayRow struct {
-		PaymentID       string `json:"payment_id"`       // Төлбөрийн ID
-		PaymentStatus   string `json:"payment_status"`   // Төлөв (NEW, PAID, FAILED, REFUNDED)
-		PaymentDate     string `json:"payment_date"`     // Төлөгдсөн хугацаа
-		PaymentFee      string `json:"payment_fee"`      // Шимтгэлийн дүн
-		PaymentAmount   string `json:"payment_amount"`   // Төлөгдсөн дүн
-		PaymentCurrency string `json:"payment_currency"` // Валют
-		PaymentWallet   string `json:"payment_wallet"`   // Ашигласан воллет
-		TransactionType string `json:"transaction_type"` // Төрөл (P2P, CARD)
+		PaymentID           string                         `json:"payment_id"`            // Төлбөрийн ID
+		PaymentStatus       string                         `json:"payment_status"`        // Төлөв (NEW, PAID, FAILED, REFUNDED)
+		PaymentDate         string                         `json:"payment_date"`          // Төлөгдсөн хугацаа
+		PaymentFee          string                         `json:"payment_fee"`           // Шимтгэлийн дүн
+		TrxFee              string                         `json:"trx_fee"`               // Шимтгэлийн дүн (payment/check)
+		PaymentAmount       string                         `json:"payment_amount"`        // Төлөгдсөн дүн
+		PaymentCurrency     string                         `json:"payment_currency"`      // Валют
+		PaymentWallet       string                         `json:"payment_wallet"`        // Ашигласан воллет
+		PaymentType         string                         `json:"payment_type"`          // Төрөл (P2P, CARD)
+		TransactionType     string                         `json:"transaction_type"`      // Төрөл (P2P, CARD)
+		NextPaymentDate     string                         `json:"next_payment_date"`     // Дараагийн төлөлтийн огноо
+		NextPaymentDatetime string                         `json:"next_payment_datetime"` // Дараагийн төлөлтийн цаг
+		CardTransactions    []*QpayCardTransactionResponse `json:"card_transactions"`     // Картын гүйлгээ
+		P2PTransactions     []*QpayP2PTransactionResponse  `json:"p2p_transactions"`      // P2P гүйлгээ
 	}
 
 	// QpayPaymentCancelRequest [Төлбөр цуцлах хүсэлт]
@@ -314,12 +472,12 @@ type (
 	// QpayPaymentListRequest [Төлбөрийн жагсаалт авах хүсэлт]
 	// See: https://developer.qpay.mn/#payment-list
 	QpayPaymentListRequest struct {
-		ObjectType           string     `json:"object_type"`            // MERCHANT, INVOICE, QR
-		ObjectID             string     `json:"object_id"`              // Merchant ID, Invoice ID эсвэл QR код
-		MerchantBranchCode   string     `json:"merchant_branch_code,omitempty"` // Салбарын код
+		ObjectType           string     `json:"object_type"`                      // MERCHANT, INVOICE, QR
+		ObjectID             string     `json:"object_id"`                        // Merchant ID, Invoice ID эсвэл QR код
+		MerchantBranchCode   string     `json:"merchant_branch_code,omitempty"`   // Салбарын код
 		MerchantTerminalCode string     `json:"merchant_terminal_code,omitempty"` // Терминалын код
 		MerchantStaffCode    string     `json:"merchant_staff_code,omitempty"`    // Ажилтны код
-		Offset               QpayOffset `json:"offset"`                 // Хуудаслалт
+		Offset               QpayOffset `json:"offset"`                           // Хуудаслалт
 	}
 
 	// QpayPaymentRow [Төлбөрийн жагсаалтын мөр]
@@ -346,6 +504,97 @@ type (
 		Count      int64             `json:"count"`       // Нийт мөрийн тоо
 		PaidAmount int64             `json:"paid_amount"` // Нийт дүн
 		Rows       []*QpayPaymentRow `json:"rows"`        // Төлбөрийн жагсаалт
+	}
+
+	// QPayEbarimtResponse [И-баримт 3.0 үүсгэх/цуцлах хариу]
+	QPayEbarimtResponse struct {
+		ID                   string              `json:"id"`
+		EbarimtBy            string              `json:"ebarimt_by"`
+		GWalletID            string              `json:"g_wallet_id"`
+		GWalletCustomerID    string              `json:"g_wallet_customer_id"`
+		EbarimtReceiverType  string              `json:"ebarimt_receiver_type"`
+		EbarimtReceiver      string              `json:"ebarimt_receiver"`
+		EbarimtDistrictCode  string              `json:"ebarimt_district_code"`
+		EbarimtBillType      string              `json:"ebarimt_bill_type"`
+		GMerchantID          string              `json:"g_merchant_id"`
+		MerchantBranchCode   string              `json:"merchant_branch_code"`
+		MerchantTerminalCode string              `json:"merchant_terminal_code"`
+		MerchantStaffCode    string              `json:"merchant_staff_code"`
+		MerchantRegister     string              `json:"merchant_register"`
+		MerchantRegisterNo   string              `json:"merchant_register_no"`
+		GPaymentID           string              `json:"g_payment_id"`
+		PaidBy               string              `json:"paid_by"`
+		ObjectType           string              `json:"object_type"`
+		ObjectID             string              `json:"object_id"`
+		Amount               string              `json:"amount"`
+		VatAmount            string              `json:"vat_amount"`
+		CityTaxAmount        string              `json:"city_tax_amount"`
+		EbarimtQRData        string              `json:"ebarimt_qr_data"`
+		EbarimtLottery       string              `json:"ebarimt_lottery"`
+		Note                 string              `json:"note"`
+		EbarimtStatus        string              `json:"ebarimt_status"`
+		EbarimtStatusDate    string              `json:"ebarimt_status_date"`
+		BarimtStatus         string              `json:"barimt_status"`
+		BarimtStatusDate     string              `json:"barimt_status_date"`
+		EbarimtSentEmail     string              `json:"ebarimt_sent_email"`
+		EbarimtReceiverPhone string              `json:"ebarimt_receiver_phone"`
+		TaxType              string              `json:"tax_type"`
+		MerchantTIN          string              `json:"merchant_tin"`
+		EbarimtReceiptID     string              `json:"ebarimt_receipt_id"`
+		CreatedBy            string              `json:"created_by"`
+		CreatedDate          string              `json:"created_date"`
+		UpdatedBy            string              `json:"updated_by"`
+		UpdatedDate          string              `json:"updated_date"`
+		Status               bool                `json:"status"`
+		BarimtItems          []*QPayEbarimtItem  `json:"barimt_items,omitempty"`
+		BarimtHistories      []*QPayEbarimtEvent `json:"barimt_histories,omitempty"`
+	}
+
+	// QPayEbarimtItem [И-баримтын бараа/үйлчилгээний мөрийн хариу]
+	QPayEbarimtItem struct {
+		ID                  string `json:"id"`
+		BarimtID            string `json:"barimt_id"`
+		MerchantProductCode string `json:"merchant_product_code"`
+		TaxProductCode      string `json:"tax_product_code"`
+		BarCode             string `json:"bar_code"`
+		Name                string `json:"name"`
+		UnitPrice           string `json:"unit_price"`
+		Quantity            string `json:"quantity"`
+		Amount              string `json:"amount"`
+		CityTaxAmount       string `json:"city_tax_amount"`
+		VatAmount           string `json:"vat_amount"`
+		Note                string `json:"note"`
+		CreatedBy           string `json:"created_by"`
+		CreatedDate         string `json:"created_date"`
+		UpdatedBy           string `json:"updated_by"`
+		UpdatedDate         string `json:"updated_date"`
+		Status              bool   `json:"status"`
+	}
+
+	// QPayEbarimtEvent [И-баримтын түүхийн хариу]
+	QPayEbarimtEvent struct {
+		ID                  string `json:"id"`
+		BarimtID            string `json:"barimt_id"`
+		EbarimtReceiverType string `json:"ebarimt_receiver_type"`
+		EbarimtReceiver     string `json:"ebarimt_receiver"`
+		EbarimtRegisterNo   string `json:"ebarimt_register_no"`
+		EbarimtBillID       string `json:"ebarimt_bill_id"`
+		EbarimtDate         string `json:"ebarimt_date"`
+		EbarimtBillType     string `json:"ebarimt_bill_type"`
+		EbarimtQRData       string `json:"ebarimt_qr_data"`
+		EbarimtLottery      string `json:"ebarimt_lottery"`
+		EbarimtErrorCode    string `json:"ebarimt_error_code"`
+		EbarimtErrorMsg     string `json:"ebarimt_error_msg"`
+		EbarimtResponseCode string `json:"ebarimt_response_code"`
+		EbarimtResponseMsg  string `json:"ebarimt_response_msg"`
+		BarimtStatus        string `json:"barimt_status"`
+		BarimtStatusDate    string `json:"barimt_status_date"`
+		TaxType             string `json:"tax_type"`
+		CreatedBy           string `json:"created_by"`
+		CreatedDate         string `json:"created_date"`
+		UpdatedBy           string `json:"updated_by"`
+		UpdatedDate         string `json:"updated_date"`
+		Status              bool   `json:"status"`
 	}
 
 	// QpayGeneralResponse [Ерөнхий хариу]

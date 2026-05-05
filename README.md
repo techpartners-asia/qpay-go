@@ -146,6 +146,88 @@ res, err := client.RefundPayment("INVOICE_ID", "PAYMENT_ID")
 payment, err := client.GetPayment("PAYMENT_ID")
 ```
 
+### Ebarimt 3.0
+
+Use `CreateEbarimtInvoice` when the invoice itself must carry Ebarimt 3.0 tax data. QPay assigns a separate Ebarimt-enabled invoice code for this flow.
+
+```go
+invoice, err := client.CreateEbarimtInvoice(qpay.QPayCreateEbarimtInvoiceInput{
+    InvoiceCode:         "TEST_EB_INVOICE",
+    SenderInvoiceNo:     "TEST_INVOICE_23",
+    InvoiceReceiverCode: "23",
+    SenderBranchCode:    "TEST_BRANCH",
+    InvoiceDescription:  "Test invoice",
+    CallbackURL:         "https://example.com/callback",
+    TaxType:             qpay.QPayTaxTypeVAT, // "1" taxable, "2" no VAT, "3" exempt
+    DistrictCode:        "0101",
+    Lines: []*qpay.QPayEbarimtInvoiceLine{
+        {
+            TaxProductCode:     "",
+            LineDescription:    "Улаан буудайн үр",
+            LineQuantity:       "1.00",
+            LineUnitPrice:      "1000.00",
+            Note:               "TEST",
+            ClassificationCode: "0111100",
+            Taxes: []*qpay.QPayEbarimtTax{
+                {
+                    TaxCode:     qpay.QPayTaxCodeVAT,
+                    Description: "НӨАТ",
+                    Amount:      "89.2857",
+                    Note:        "НӨАТ",
+                },
+                {
+                    TaxCode:     qpay.QPayTaxCodeCity,
+                    Description: "City tax",
+                    Amount:      "17.8571",
+                    Note:        "TEST",
+                },
+            },
+        },
+        {
+            TaxProductCode:     "",
+            LineDescription:    "Бусад төрлийн сорго будаа",
+            LineQuantity:       "1.00",
+            LineUnitPrice:      "1000.00",
+            Note:               "TEST",
+            ClassificationCode: "0114200",
+            Taxes: []*qpay.QPayEbarimtTax{
+                {
+                    TaxCode:     qpay.QPayTaxCodeVAT,
+                    Description: "НӨАТ",
+                    Amount:      "90.91",
+                    Note:        "НӨАТ",
+                },
+            },
+        },
+    },
+})
+```
+
+For `QPayTaxTypeNoVAT` and `QPayTaxTypeVATExempt`, the SDK sends `calculate_vat: false` unless you explicitly override it.
+
+When QPay calls your callback URL, return HTTP `200` with body `SUCCESS`, then call `CheckPayment` with the invoice ID. Do not cron-poll `CheckPayment`.
+
+```go
+payment, err := client.CheckPayment(invoice.InvoiceID, 100, 1)
+```
+
+If you create Ebarimt after a payment is already paid:
+
+```go
+barimt, err := client.CreateEbarimt(qpay.QPayEbarimtCreateInput{
+    PaymentID:           "PAYMENT_ID",
+    EbarimtReceiverType: qpay.QPayEbarimtReceiverCitizen, // or QPayEbarimtReceiverCompany
+    EbarimtReceiver:     "88614450",                      // phone or company register
+    DistrictCode:        "3505",
+    ClassificationCode:  "0000010",
+})
+```
+
+Cancel Ebarimt by payment ID:
+
+```go
+barimt, err := client.CancelEbarimt("PAYMENT_ID")
+```
 
 ---
 

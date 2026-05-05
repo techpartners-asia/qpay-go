@@ -59,6 +59,16 @@ var (
 		Url:    "/payment/list",
 		Method: http.MethodPost,
 	}
+	// QPayEbarimtCreate [И-баримт үүсгэх]
+	QPayEbarimtCreate = utils.API{
+		Url:    "/ebarimt_v3/create",
+		Method: http.MethodPost,
+	}
+	// QPayEbarimtCancel [И-баримт цуцлах]
+	QPayEbarimtCancel = utils.API{
+		Url:    "/ebarimt_v3/",
+		Method: http.MethodDelete,
+	}
 )
 
 // httpRequestQPay [Internal: QPay API-руу HTTP хүсэлт илгээх туслах функц]
