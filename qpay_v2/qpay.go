@@ -149,7 +149,7 @@ func (q *qpay) CreateInvoice(input QPayCreateInvoiceInput) (QPaySimpleInvoiceRes
 		callbackUrl = *input.CallbackUrl
 	}
 	if len(vals) > 0 {
-		callbackUrl = fmt.Sprintf("%s?%s", q.callback, vals.Encode())
+		callbackUrl = fmt.Sprintf("%s?%s", callbackUrl, vals.Encode())
 	}
 
 	var minAmt *int64
