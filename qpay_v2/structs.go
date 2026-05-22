@@ -56,6 +56,7 @@ type (
 		InvoiceReceiverData *InvoiceReceiverData      // Хэрэглэгчийн мэдээлэл (заавал биш)
 		InvoiceDescription  string                    // Нэхэмжлэлийн утга/тайлбар (invoice_description)
 		Amount              int64                     // Мөнгөн дүн (бүхэл тоогоор)
+		CallbackUrl         *string                   // Төлбөр төлөгдсөнийг мэдэгдэх хаяг (заавал биш). Оруулаагүй тохиолдолд клэйнт үүсгэх үеийн анхны хаягаа ашиглана
 		CallbackParam       map[string]string         // URL-д нэмэгдэх параметрүүд
 		Note                string                    // Тэмдэглэл (заавал биш)
 		Lines               []*QpayLineRequest        // Нэхэмжлэлийн мөрүүд (заавал биш)
