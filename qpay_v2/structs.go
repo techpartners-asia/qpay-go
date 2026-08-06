@@ -71,6 +71,14 @@ type (
 		TaxCustomerCode     string                    // ИБаримт үүсгүүлэх байгууллага/хэрэглэгчийн регистр
 		LineTaxCode         string                    // БТҮК код (Мөр хоосон үед ашиглана)
 		Transactions        []*QpayTransactionRequest // Гүйлгээний мэдээлэл (Данс тохируулах)
+		// Subscription / автомат төлөлт (картын гүйлгээнд хамаарна)
+		AllowSubscribe       bool   // Автомат төлөлт зөвшөөрөх эсэх
+		SubscriptionInterval string // Автомат төлөлтийн давтамж (1D=өдөр, 1W=долоо хоног, 1M=сар)
+		SubscriptionWebhook  string // Автомат төлөгдсөн эсэхийг мэдэгдэх URL
+		// Inline и-баримт мэдээлэл (и-баримт үүсгэх бол заавал шаардлагатай)
+		TaxType      QPayTaxType // НӨАТ-ын төрөл
+		DistrictCode string      // Дүүргийн код (жишээ: 3505)
+		Lottery      []any       // Сугалааны мэдээлэл (schema уян хатан тул any)
 	}
 
 	// QPayCreateEbarimtInvoiceInput [И-баримт 3.0 мэдээлэлтэй нэхэмжлэх үүсгэх оролт]
@@ -260,32 +268,38 @@ type (
 	// QPaySimpleInvoiceRequest [Нэхэмжлэх үүсгэх хүсэлт]
 	// See: https://developer.qpay.mn/#invoice-Create
 	QPaySimpleInvoiceRequest struct {
-		InvoiceCode         string                    `json:"invoice_code"`                    // qpay-ээс өгсөн нэхэмжлэхийн код
-		SenderInvoiceNo     string                    `json:"sender_invoice_no"`               // Байгууллагаас үүсгэх дугаар
-		SenderBranchCode    string                    `json:"sender_branch_code,omitempty"`    // Салбарын код
-		SenderBranchData    *SenderBranchData         `json:"sender_branch_data,omitempty"`    // Салбарын мэдээлэл
-		SenderTerminalCode  string                    `json:"sender_terminal_code,omitempty"`  // Терминалын код
-		SenderTerminalData  *SenderTerminalData       `json:"sender_terminal_data,omitempty"`  // Терминалын мэдээлэл
-		SenderStaffCode     string                    `json:"sender_staff_code,omitempty"`     // Ажилтны код
-		SenderStaffData     *SenderStaffData          `json:"sender_staff_data,omitempty"`     // Ажилтны мэдээлэл
-		InvoiceReceiverCode string                    `json:"invoice_receiver_code,omitempty"` // Хэрэглэгчийн ID/Код
-		InvoiceReceiverData *InvoiceReceiverData      `json:"invoice_receiver_data,omitempty"` // Хэрэглэгчийн мэдээлэл
-		InvoiceDescription  string                    `json:"invoice_description"`             // Нэхэмжлэлийн утга
-		Amount              int64                     `json:"amount"`                          // Нийт дүн
-		CallbackUrl         string                    `json:"callback_url"`                    // Хариу авах URL
-		InvoiceDueDate      string                    `json:"invoice_due_date,omitempty"`      // Хүчинтэй хугацаа
-		ExpiryDate          string                    `json:"expiry_date,omitempty"`           // Дуусах хугацаа
-		EnableExpiry        bool                      `json:"enable_expiry"`                   // Дуусах хугацаа ашиглах
-		AllowPartial        bool                      `json:"allow_partial"`                   // Хувааж төлөх
-		MinimumAmount       *int64                    `json:"minimum_amount,omitempty"`        // Хамгийн бага төлөх дүн
-		AllowExceed         bool                      `json:"allow_exceed"`                    // Илүү төлөлт
-		MaximumAmount       *int64                    `json:"maximum_amount,omitempty"`        // Хамгийн их төлөх дүн
-		CalculateVat        bool                      `json:"calculate_vat"`                   // НӨАТ тооцох
-		Note                string                    `json:"note,omitempty"`                  // Тэмдэглэл
-		Lines               []*QpayLineRequest        `json:"lines,omitempty"`                 // Нэхэмжлэлийн мөрүүд
-		TaxCustomerCode     string                    `json:"tax_customer_code,omitempty"`     // ИБаримт регистр
-		LineTaxCode         string                    `json:"line_tax_code,omitempty"`         // БТҮК код
-		Transactions        []*QpayTransactionRequest `json:"transactions,omitempty"`          // Дансны тохиргоо
+		InvoiceCode          string                    `json:"invoice_code"`                    // qpay-ээс өгсөн нэхэмжлэхийн код
+		SenderInvoiceNo      string                    `json:"sender_invoice_no"`               // Байгууллагаас үүсгэх дугаар
+		SenderBranchCode     string                    `json:"sender_branch_code,omitempty"`    // Салбарын код
+		SenderBranchData     *SenderBranchData         `json:"sender_branch_data,omitempty"`    // Салбарын мэдээлэл
+		SenderTerminalCode   string                    `json:"sender_terminal_code,omitempty"`  // Терминалын код
+		SenderTerminalData   *SenderTerminalData       `json:"sender_terminal_data,omitempty"`  // Терминалын мэдээлэл
+		SenderStaffCode      string                    `json:"sender_staff_code,omitempty"`     // Ажилтны код
+		SenderStaffData      *SenderStaffData          `json:"sender_staff_data,omitempty"`     // Ажилтны мэдээлэл
+		InvoiceReceiverCode  string                    `json:"invoice_receiver_code,omitempty"` // Хэрэглэгчийн ID/Код
+		InvoiceReceiverData  *InvoiceReceiverData      `json:"invoice_receiver_data,omitempty"` // Хэрэглэгчийн мэдээлэл
+		InvoiceDescription   string                    `json:"invoice_description"`             // Нэхэмжлэлийн утга
+		Amount               int64                     `json:"amount"`                          // Нийт дүн
+		CallbackUrl          string                    `json:"callback_url"`                    // Хариу авах URL
+		InvoiceDueDate       string                    `json:"invoice_due_date,omitempty"`      // Хүчинтэй хугацаа
+		ExpiryDate           string                    `json:"expiry_date,omitempty"`           // Дуусах хугацаа
+		EnableExpiry         bool                      `json:"enable_expiry"`                   // Дуусах хугацаа ашиглах
+		AllowPartial         bool                      `json:"allow_partial"`                   // Хувааж төлөх
+		MinimumAmount        *int64                    `json:"minimum_amount,omitempty"`        // Хамгийн бага төлөх дүн
+		AllowExceed          bool                      `json:"allow_exceed"`                    // Илүү төлөлт
+		MaximumAmount        *int64                    `json:"maximum_amount,omitempty"`        // Хамгийн их төлөх дүн
+		CalculateVat         bool                      `json:"calculate_vat"`                   // НӨАТ тооцох
+		Note                 string                    `json:"note,omitempty"`                  // Тэмдэглэл
+		Lines                []*QpayLineRequest        `json:"lines,omitempty"`                 // Нэхэмжлэлийн мөрүүд
+		TaxCustomerCode      string                    `json:"tax_customer_code,omitempty"`     // ИБаримт регистр
+		LineTaxCode          string                    `json:"line_tax_code,omitempty"`         // БТҮК код
+		Transactions         []*QpayTransactionRequest `json:"transactions,omitempty"`          // Дансны тохиргоо
+		AllowSubscribe       bool                      `json:"allow_subscribe,omitempty"`       // Автомат төлөлт зөвшөөрөх
+		SubscriptionInterval string                    `json:"subscription_interval,omitempty"` // Автомат төлөлтийн давтамж (1D,1W,1M)
+		SubscriptionWebhook  string                    `json:"subscription_webhook,omitempty"`  // Автомат төлөлтийн webhook URL
+		TaxType              string                    `json:"tax_type,omitempty"`              // НӨАТ-ын төрөл (и-баримт)
+		DistrictCode         string                    `json:"district_code,omitempty"`         // Дүүргийн код (и-баримт)
+		Lottery              []any                     `json:"lottery,omitempty"`               // Сугалааны мэдээлэл
 	}
 
 	// QPaySimpleInvoiceResponse [Нэхэмжлэх үүсгэх хариу]
@@ -463,6 +477,8 @@ type (
 		BranchCode   string // Салбарын код
 		TerminalCode string // Терминалын код
 		StaffCode    string // Ажилтны код
+		StartDate    string // Гүйлгээ эхлэх цаг (заавал биш). Формат: yyyy-MM-dd HH:mm:ss
+		EndDate      string // Гүйлгээ дуусах цаг (заавал биш). Формат: yyyy-MM-dd HH:mm:ss
 		PageLimit    int64  // Нэг хуудас дахь мөрийн тоо
 		PageNumber   int64  // Хуудасны дугаар
 	}
@@ -475,6 +491,8 @@ type (
 		MerchantBranchCode   string     `json:"merchant_branch_code,omitempty"`   // Салбарын код
 		MerchantTerminalCode string     `json:"merchant_terminal_code,omitempty"` // Терминалын код
 		MerchantStaffCode    string     `json:"merchant_staff_code,omitempty"`    // Ажилтны код
+		StartDate            string     `json:"start_date,omitempty"`             // Гүйлгээ эхлэх цаг (yyyy-MM-dd HH:mm:ss)
+		EndDate              string     `json:"end_date,omitempty"`               // Гүйлгээ дуусах цаг (yyyy-MM-dd HH:mm:ss)
 		Offset               QpayOffset `json:"offset"`                           // Хуудаслалт
 	}
 
