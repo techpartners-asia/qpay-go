@@ -2,6 +2,11 @@ package qpay_v1
 
 import (
 	"encoding/json"
+	"fmt"
+	"net/http"
+	"sync"
+
+	"github.com/techpartners-asia/qpay-go/utils"
 )
 
 type qpay struct {
@@ -15,7 +20,10 @@ type qpay struct {
 	templateId    string
 	branchId      string
 	posId         string
-	loginObject   *QpayLoginResponse
+
+	mu          sync.RWMutex
+	loginObject *QpayLoginResponse
+	client      *http.Client
 }
 
 type QPay interface {
@@ -37,6 +45,7 @@ func New(client_id, client_secret, endpoint, callback, merchantId, templateId, b
 		branchId:      branchId,
 		posId:         posId,
 		loginObject:   nil,
+		client:        utils.NewHTTPClient(),
 	}
 }
 
@@ -52,10 +61,13 @@ func (q *qpay) CreateInvoice(input QPayInvoiceCreateRequest) (QPaySimpleInvoiceR
 	}
 
 	var response QPaySimpleInvoiceResponse
-	json.Unmarshal(res, &response)
+	if err := json.Unmarshal(res, &response); err != nil {
+		return QPaySimpleInvoiceResponse{}, fmt.Errorf("qpay: decode invoice create response: %w", err)
+	}
 
 	return response, nil
 }
+
 func (q *qpay) GetInvoice(invoiceId string) (QpayInvoiceGetResponse, error) {
 	res, err := q.httpRequestQPay(nil, QPayInvoiceGet, invoiceId)
 	if err != nil {
@@ -63,7 +75,9 @@ func (q *qpay) GetInvoice(invoiceId string) (QpayInvoiceGetResponse, error) {
 	}
 
 	var response QpayInvoiceGetResponse
-	json.Unmarshal(res, &response)
+	if err := json.Unmarshal(res, &response); err != nil {
+		return QpayInvoiceGetResponse{}, fmt.Errorf("qpay: decode invoice get response: %w", err)
+	}
 
 	return response, nil
 }
@@ -76,7 +90,9 @@ func (q *qpay) CheckPayment(paymentID string) (QpayPaymentCheckResponse, error) 
 		return response, err
 	}
 
-	json.Unmarshal(res, &response)
+	if err := json.Unmarshal(res, &response); err != nil {
+		return QpayPaymentCheckResponse{}, fmt.Errorf("qpay: decode payment check response: %w", err)
+	}
 
 	return response, nil
 }

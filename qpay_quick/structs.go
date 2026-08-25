@@ -8,72 +8,75 @@ type (
 		AccessToken      string `json:"access_token"`       // Хандалтын токен
 		ExpiresIn        int64  `json:"expires_in"`         // Хандалтын токены хүчинтэй хугацаа (Unix timestamp)
 		Scope            string `json:"scope"`              // Хандах хүрээ
-		NotBeforePolicy  string `json:"not-before-policy"`  // Бодлого
-		SessionState     string `json:"session_state"`      // Сессийн төлөв
+		// NotBeforePolicy [Бодлого]. qPay (Keycloak) энэ талбарыг тоо эсвэл
+		// тэмдэгт мөрөөр буцаадаг тул `any`. Тогтмол төрөл зааж өгвөл нэг л
+		// төрөл өөрчлөгдөхөд нэвтрэлт бүхэлдээ унана.
+		NotBeforePolicy any    `json:"not-before-policy"`
+		SessionState    string `json:"session_state"` // Сессийн төлөв
 	}
 
 	// QpayCompanyCreateRequest [Байгууллагаар мерчант үүсгэх/шинэчлэх хүсэлт]
 	QpayCompanyCreateRequest struct {
-		OwnerRegNo     string `json:"owner_register_no,omitempty"`  // Эзэмшигчийн регистр
-		OwnerFirstName string `json:"owner_first_name"`             // Эзэмшигчийн овог
-		OwnerLastName  string `json:"owner_last_name"`              // Эзэмшигчийн нэр
-		LocationLat    string `json:"location_lat,omitempty"`       // Өргөрөг
-		LocationLng    string `json:"location_lng,omitempty"`       // Уртраг
-		RegisterNo     string `json:"register_number"`              // Байгууллагын регистр
-		CompanyName    string `json:"company_name"`                 // Байгууллагын нэр
-		Name           string `json:"name"`                         // Бизнесийн нэр
-		NameEng        string `json:"name_eng,omitempty"`           // Бизнесийн англи нэр
-		MCCcode        string `json:"mcc_code"`                     // МCC код
-		City           string `json:"city"`                         // Хот, аймгийн код
-		District       string `json:"district"`                     // Сум, дүүргийн код
-		Address        string `json:"address"`                      // Хаяг
-		Phone          string `json:"phone"`                        // Утас
-		Email          string `json:"email"`                        // И-мэйл
+		OwnerRegNo     string `json:"owner_register_no,omitempty"` // Эзэмшигчийн регистр
+		OwnerFirstName string `json:"owner_first_name"`            // Эзэмшигчийн овог
+		OwnerLastName  string `json:"owner_last_name"`             // Эзэмшигчийн нэр
+		LocationLat    string `json:"location_lat,omitempty"`      // Өргөрөг
+		LocationLng    string `json:"location_lng,omitempty"`      // Уртраг
+		RegisterNo     string `json:"register_number"`             // Байгууллагын регистр
+		CompanyName    string `json:"company_name"`                // Байгууллагын нэр
+		Name           string `json:"name"`                        // Бизнесийн нэр
+		NameEng        string `json:"name_eng,omitempty"`          // Бизнесийн англи нэр
+		MCCcode        string `json:"mcc_code"`                    // МCC код
+		City           string `json:"city"`                        // Хот, аймгийн код
+		District       string `json:"district"`                    // Сум, дүүргийн код
+		Address        string `json:"address"`                     // Хаяг
+		Phone          string `json:"phone"`                       // Утас
+		Email          string `json:"email"`                       // И-мэйл
 	}
 
 	// QpayCompanyCreateResponse [Байгууллагаар мерчант үүсгэсэн хариу]
 	QpayCompanyCreateResponse struct {
-		ID                    string `json:"id"`                      // Мерчантын ID
-		VendorID              string `json:"vendor_id"`               // Вендорын ID
-		Type                  string `json:"type"`                    // COMPANY
-		RegisterNo            string `json:"register_number"`         // Регистр
-		Name                  string `json:"name"`                    // Бизнесийн нэр
-		NameEng               string `json:"name_eng"`                // Англи нэр
-		OwnerRegNo            string `json:"owner_register_no"`       // Эзэмшигчийн регистр
-		OwnerFirstName        string `json:"owner_first_name"`        // Эзэмшигчийн овог
-		OwnerLastName         string `json:"owner_last_name"`         // Эзэмшигчийн нэр
-		CompanyName           string `json:"company_name"`            // Байгууллагын нэр
-		GBusinessDirectionID  string `json:"g_business_direction_id"` // Бизнесийн чиглэлийн ID
-		MCCcode               string `json:"mcc_code"`                // МCC код
-		City                  string `json:"city"`                    // Хот
-		District              string `json:"district"`                // Дүүрэг
-		Address               string `json:"address"`                 // Хаяг
-		Phone                 string `json:"phone"`                   // Утас
-		Email                 string `json:"email"`                   // И-мэйл
-		LocationLat           string `json:"location_lat"`            // Өргөрөг
-		LocationLng           string `json:"location_lng"`            // Уртраг
+		ID                   string `json:"id"`                      // Мерчантын ID
+		VendorID             string `json:"vendor_id"`               // Вендорын ID
+		Type                 string `json:"type"`                    // COMPANY
+		RegisterNo           string `json:"register_number"`         // Регистр
+		Name                 string `json:"name"`                    // Бизнесийн нэр
+		NameEng              string `json:"name_eng"`                // Англи нэр
+		OwnerRegNo           string `json:"owner_register_no"`       // Эзэмшигчийн регистр
+		OwnerFirstName       string `json:"owner_first_name"`        // Эзэмшигчийн овог
+		OwnerLastName        string `json:"owner_last_name"`         // Эзэмшигчийн нэр
+		CompanyName          string `json:"company_name"`            // Байгууллагын нэр
+		GBusinessDirectionID string `json:"g_business_direction_id"` // Бизнесийн чиглэлийн ID
+		MCCcode              string `json:"mcc_code"`                // МCC код
+		City                 string `json:"city"`                    // Хот
+		District             string `json:"district"`                // Дүүрэг
+		Address              string `json:"address"`                 // Хаяг
+		Phone                string `json:"phone"`                   // Утас
+		Email                string `json:"email"`                   // И-мэйл
+		LocationLat          string `json:"location_lat"`            // Өргөрөг
+		LocationLng          string `json:"location_lng"`            // Уртраг
 	}
 
 	// QpayPersonCreateRequest [Хувь хүнээр мерчант үүсгэх/шинэчлэх хүсэлт]
 	QpayPersonCreateRequest struct {
-		RegisterNo      string `json:"register_number"`           // Хувь хүний регистр
-		FirstName       string `json:"first_name"`                // Овог
-		LastName        string `json:"last_name"`                 // Нэр
-		BusinessName    string `json:"business_name"`             // Бизнесийн нэр
+		RegisterNo      string `json:"register_number"`             // Хувь хүний регистр
+		FirstName       string `json:"first_name"`                  // Овог
+		LastName        string `json:"last_name"`                   // Нэр
+		BusinessName    string `json:"business_name"`               // Бизнесийн нэр
 		BusinessNameEng string `json:"business_name_eng,omitempty"` // Англи нэр
-		MCCcode         string `json:"mcc_code"`                  // МCC код
-		City            string `json:"city"`                      // Хот
-		District        string `json:"district"`                  // Дүүрэг
-		Address         string `json:"address"`                   // Хаяг
-		Phone           string `json:"phone"`                     // Утас
-		Email           string `json:"email"`                     // И-мэйл
+		MCCcode         string `json:"mcc_code"`                    // МCC код
+		City            string `json:"city"`                        // Хот
+		District        string `json:"district"`                    // Дүүрэг
+		Address         string `json:"address"`                     // Хаяг
+		Phone           string `json:"phone"`                       // Утас
+		Email           string `json:"email"`                       // И-мэйл
 	}
 
 	// QpayPersonCreateResponse [Хувь хүнээр мерчант үүсгэсэн хариу]
 	QpayPersonCreateResponse struct {
 		ID                   string `json:"id"`
 		VendorID             string `json:"vendor_id"`
-		Type                 string `json:"type"`                    // PERSON
+		Type                 string `json:"type"` // PERSON
 		RegisterNo           string `json:"register_number"`
 		FirstName            string `json:"first_name"`
 		LastName             string `json:"last_name"`

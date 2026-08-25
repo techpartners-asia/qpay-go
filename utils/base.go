@@ -5,11 +5,6 @@ import (
 	"strconv"
 )
 
-// int64Pointer Get int64 pointer
-func int64Pointer(i int64) *int64 {
-	return &i
-}
-
 // StrToUint String to Uint parser
 func StrToUint(value string) (uint, error) {
 	u64, err := strconv.ParseUint(value, 10, 32)
@@ -29,19 +24,45 @@ func AppendAsString(args ...interface{}) string {
 	return appendedStr
 }
 
+// GetValidString renders any decoded JSON value as a string.
+// Non-string values (JSON numbers decode to float64, booleans to bool)
+// are formatted rather than type-asserted, so they cannot panic.
 func GetValidString(source interface{}) string {
-	if source == nil {
+	switch v := source.(type) {
+	case nil:
 		return ""
-	} else {
-		return source.(string)
+	case string:
+		return v
+	case fmt.Stringer:
+		return v.String()
+	default:
+		return fmt.Sprintf("%v", v)
 	}
 }
 
+// GetValidFloat reads any decoded JSON value as a float64.
+// qPay sends monetary amounts as both JSON strings ("100.00") and JSON
+// numbers depending on the endpoint, so both are accepted. Anything that
+// cannot be interpreted as a number yields 0.
 func GetValidFloat(source interface{}) float64 {
-	if source == nil {
-		return float64(0)
-	} else {
-		num, _ := strconv.ParseFloat(source.(string), 64)
+	switch v := source.(type) {
+	case nil:
+		return 0
+	case float64:
+		return v
+	case float32:
+		return float64(v)
+	case int:
+		return float64(v)
+	case int64:
+		return float64(v)
+	case string:
+		num, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			return 0
+		}
 		return num
+	default:
+		return 0
 	}
 }

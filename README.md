@@ -8,7 +8,7 @@ Unofficial Go SDK for the [QPay](https://qpay.mn) payment gateway. Supports QPay
 go get github.com/techpartners-asia/qpay-go
 ```
 
-**Requires Go 1.23+**
+**Requires Go 1.27+** (set by the `go` directive in `go.mod`)
 
 ---
 
@@ -146,6 +146,27 @@ res, err := client.RefundPayment("INVOICE_ID", "PAYMENT_ID")
 payment, err := client.GetPayment("PAYMENT_ID")
 ```
 
+### Get Payment List
+
+```go
+list, err := client.GetPaymentList(qpay.QPayPaymentListInput{
+    ObjectType: "MERCHANT",              // defaults to MERCHANT
+    ObjectID:   "MERCHANT_ID",           // defaults to the merchant ID passed to New()
+    StartDate:  "2024-01-01 00:00:00",
+    EndDate:    "2024-01-31 23:59:59",
+    PageLimit:  100,
+    PageNumber: 1,
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Println(list.Count, list.PaidAmount)
+for _, row := range list.Rows {
+    fmt.Println(row.PaymentID, row.PaymentStatus)
+}
+```
+
 ### Ebarimt 3.0
 
 Use `CreateEbarimtInvoice` when the invoice itself must carry Ebarimt 3.0 tax data. QPay assigns a separate Ebarimt-enabled invoice code for this flow.
@@ -280,10 +301,9 @@ import qpay "github.com/techpartners-asia/qpay-go/qpay_quick"
 client := qpay.New(
     "USERNAME",
     "PASSWORD",
-    "https://quickpay.qpay.mn", // endpoint
-    "https://yourapp.com/callback",
-    "INVOICE_CODE",
-    "TERMINAL_ID",
+    "https://quickpay.qpay.mn",     // endpoint
+    "https://yourapp.com/callback", // callback base URL
+    "TERMINAL_ID",                  // terminal ID assigned by QPay
 )
 
 // Register a company merchant
@@ -311,11 +331,8 @@ person, err := client.CreatePerson(qpay.QpayPersonCreateRequest{
 // Get a merchant
 merchant, err := client.GetMerchant("MERCHANT_ID")
 
-// List merchants
-merchants, err := client.ListMerchant(qpay.QpayOffset{
-    PageNumber: 1,
-    PageLimit:  20,
-})
+// List merchants (page, limit)
+merchants, err := client.ListMerchant(1, 20)
 
 // Create invoice for a sub-merchant
 invoice, err := client.CreateInvoice(qpay.QpayInvoiceRequest{
@@ -334,11 +351,14 @@ payment, err := client.CheckPayment("INVOICE_ID")
 fmt.Println(payment.InvoiceStatus) // OPEN, PAID, CLOSED
 ```
 
+`qpay_quick.New()` accepts the same `WithSyncAuth()` and `WithClient(c)` options as `qpay_v2`.
+
 ---
 
 ## Error Handling
 
-All methods return a standard Go `error`. On HTTP errors, the error contains the raw response body from QPay.
+All methods return a standard Go `error`. Always check it — a non-nil error means the
+returned struct is the zero value and must not be read.
 
 ```go
 invoice, err := client.CreateInvoice(input)
@@ -347,6 +367,37 @@ if err != nil {
     return
 }
 ```
+
+An error is returned when:
+
+| Cause | Notes |
+|---|---|
+| Authentication failed | Includes a QPay auth response carrying no `access_token` |
+| HTTP status outside `2xx` | The error carries the status code and the response body, truncated to 512 bytes |
+| Transport failure or timeout | Requests time out after 60s by default |
+| The response body is not valid JSON | e.g. an HTML error page from a proxy |
+
+Errors wrap their cause, so `errors.Is` / `errors.As` work against the underlying
+`net/http` or `encoding/json` error.
+
+> **Note:** error strings embed the QPay response body, which may echo request details.
+> Treat them as sensitive when forwarding to logs or to end users.
+
+---
+
+## Security Notes
+
+- **Invoice and payment IDs are escaped** before being placed in a request path, so an ID
+  that reaches the SDK from an end user cannot retarget the request at a different QPay
+  endpoint. You should still validate IDs at your own trust boundary.
+- **Credentials** are sent as HTTP Basic auth over TLS 1.2+. Never log the
+  username/password pair or a returned access token.
+- **Callback URLs** are parsed and re-encoded when `CallbackParam` is supplied. Parameters
+  are merged into any query string the URL already carries, and the result is
+  alphabetically ordered — do not depend on parameter ordering in your callback handler.
+- **Callback authenticity is not verified by this SDK.** When QPay calls your callback,
+  treat it as an untrusted notification: always confirm with `CheckPayment` before
+  releasing goods or services.
 
 ---
 

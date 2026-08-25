@@ -8,8 +8,11 @@ type (
 		AccessToken      string `json:"access_token"`
 		ExpiresIn        int    `json:"expires_in"`
 		Scope            string `json:"scope"`
-		NotBeforePolicy  string `json:"not-before-policy"`
-		SessionState     string `json:"session_state"`
+		// NotBeforePolicy [Бодлого]. qPay (Keycloak) энэ талбарыг тоо эсвэл
+		// тэмдэгт мөрөөр буцаадаг тул `any`. Тогтмол төрөл зааж өгвөл нэг л
+		// төрөл өөрчлөгдөхөд нэвтрэлт бүхэлдээ унана.
+		NotBeforePolicy any    `json:"not-before-policy"`
+		SessionState    string `json:"session_state"`
 	}
 
 	QPayCreateInvoiceInput struct {

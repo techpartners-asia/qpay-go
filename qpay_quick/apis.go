@@ -1,11 +1,13 @@
 package qpay_quick
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/techpartners-asia/qpay-go/utils"
+	"resty.dev/v3"
 )
 
 var (
@@ -106,7 +108,7 @@ func (q *qpayquick) httpRequestQPay(body interface{}, result interface{}, api ut
 	}
 	q.mu.RUnlock()
 
-	url := q.endpoint + api.Url + urlExt
+	url := q.endpoint + api.Url + utils.EscapePathSegment(urlExt)
 	req := q.client.R().
 		SetHeader("Content-Type", "application/json").
 		SetAuthToken(token).
@@ -120,15 +122,28 @@ func (q *qpayquick) httpRequestQPay(body interface{}, result interface{}, api ut
 	if err != nil {
 		return err
 	}
+	defer closeBody(res)
 
-	if res.IsError() {
+	// Anything outside 2xx is an error. Checking only for >= 400 let 3xx
+	// responses through with `result` left at its zero value, which reads
+	// downstream as a successful-but-empty payment.
+	if !res.IsStatusSuccess() {
 		return fmt.Errorf("%s-QPay response error: %s (Status: %d)",
 			time.Now().Format("2006-01-02 15:04:05"),
-			res.String(),
+			utils.TruncateForError(res.String()),
 			res.StatusCode())
 	}
 
 	return nil
+}
+
+// closeBody releases a response body. Resty drains and closes it while
+// decoding 2xx and >=400 responses, but not for 204 or 3xx, and the body's
+// Close is what cancels the per-request timeout context.
+func closeBody(res *resty.Response) {
+	if res != nil && res.Body != nil {
+		_ = res.Body.Close()
+	}
 }
 
 // authQPayV2 [Internal: qPay-ээс Access Token авах/шинэчлэх]
@@ -184,12 +199,29 @@ func (q *qpayquick) authQPayV2() (qpayLoginResponse, error) {
 
 // tokenValid checks if access token is still valid (must hold mu.RLock)
 func (q *qpayquick) tokenValid() bool {
-	return time.Now().Before(time.Unix(q.loginObject.ExpiresIn, 0).Add(-1 * time.Minute))
+	return tokenStillValid(q.loginObject.ExpiresIn)
 }
 
 // refreshTokenValid checks if refresh token is still valid (must hold mu.RLock)
 func (q *qpayquick) refreshTokenValid() bool {
-	return time.Now().Before(time.Unix(q.loginObject.RefreshExpiresIn, 0).Add(-1 * time.Minute))
+	return tokenStillValid(q.loginObject.RefreshExpiresIn)
+}
+
+// tokenStillValid reports whether a qPay expiry field is comfortably in the
+// future. qPay documents expires_in as a Unix timestamp; a value too small to
+// be one is a relative duration whose issue time we do not know, so it is
+// never treated as cacheable.
+func tokenStillValid(expiresIn int64) bool {
+	if expiresIn <= 0 {
+		return false
+	}
+
+	const minPlausibleTimestamp = 1_000_000_000 // 2001-09-09
+	if expiresIn < minPlausibleTimestamp {
+		return false
+	}
+
+	return time.Now().Before(time.Unix(expiresIn, 0).Add(-1 * time.Minute))
 }
 
 // doAuth [Full auth: username/password + terminal_id]
@@ -204,9 +236,15 @@ func (q *qpayquick) doAuth() (qpayLoginResponse, error) {
 	if err != nil {
 		return authRes, err
 	}
-	if res.IsError() {
+	defer closeBody(res)
+	if !res.IsStatusSuccess() {
 		return authRes, fmt.Errorf("%s-QPay auth failed: %s (Status: %d)",
-			time.Now().Format("2006-01-02 15:04:05"), res.String(), res.StatusCode())
+			time.Now().Format("2006-01-02 15:04:05"), utils.TruncateForError(res.String()), res.StatusCode())
+	}
+	if authRes.AccessToken == "" {
+		// Caching a tokenless response would send every later request with an
+		// empty bearer and re-authenticate on each one.
+		return qpayLoginResponse{}, errors.New("qpay: auth response contained no access token")
 	}
 	return authRes, nil
 }
@@ -222,9 +260,13 @@ func (q *qpayquick) doRefresh(refreshToken string) (qpayLoginResponse, error) {
 	if err != nil {
 		return authRes, err
 	}
-	if res.IsError() {
+	defer closeBody(res)
+	if !res.IsStatusSuccess() {
 		return authRes, fmt.Errorf("%s-QPay refresh failed: %s (Status: %d)",
-			time.Now().Format("2006-01-02 15:04:05"), res.String(), res.StatusCode())
+			time.Now().Format("2006-01-02 15:04:05"), utils.TruncateForError(res.String()), res.StatusCode())
+	}
+	if authRes.AccessToken == "" {
+		return qpayLoginResponse{}, errors.New("qpay: refresh response contained no access token")
 	}
 	return authRes, nil
 }
