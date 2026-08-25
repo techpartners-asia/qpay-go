@@ -2,13 +2,12 @@ package qpay_v2
 
 import (
 	"crypto/tls"
-	"fmt"
 	"net"
 	"net/http"
-	"net/url"
 	"sync"
 	"time"
 
+	"github.com/techpartners-asia/qpay-go/utils"
 	"golang.org/x/sync/singleflight"
 	"resty.dev/v3"
 )
@@ -139,18 +138,13 @@ func New(username, password, endpoint, callback, invoiceCode, merchantId string,
 
 // CreateInvoice [Нэхэмжлэх үүсгэх]
 func (q *qpay) CreateInvoice(input QPayCreateInvoiceInput) (QPaySimpleInvoiceResponse, error) {
-	vals := url.Values{}
-	for k, v := range input.CallbackParam {
-		vals.Add(k, v)
-	}
-
 	callbackUrl := q.callback
 	if input.CallbackUrl != nil {
 		callbackUrl = *input.CallbackUrl
 	}
-	if len(vals) > 0 {
-		callbackUrl = fmt.Sprintf("%s?%s", callbackUrl, vals.Encode())
-	}
+	// Merge params into any query string the callback URL already carries;
+	// blindly appending "?" produced a second one and silently dropped them.
+	callbackUrl = utils.BuildCallbackURL(callbackUrl, input.CallbackParam)
 
 	var minAmt *int64
 	if input.MinimumAmount > 0 {
@@ -219,18 +213,11 @@ func (q *qpay) CreateEbarimtInvoice(input QPayCreateEbarimtInvoiceInput) (QPaySi
 }
 
 func (q *qpay) newEbarimtInvoiceRequest(input QPayCreateEbarimtInvoiceInput) QPayEbarimtInvoiceRequest {
-	vals := url.Values{}
-	for k, v := range input.CallbackParam {
-		vals.Add(k, v)
-	}
-
 	callbackURL := input.CallbackURL
 	if callbackURL == "" {
 		callbackURL = q.callback
 	}
-	if len(vals) > 0 {
-		callbackURL = fmt.Sprintf("%s?%s", callbackURL, vals.Encode())
-	}
+	callbackURL = utils.BuildCallbackURL(callbackURL, input.CallbackParam)
 
 	invoiceCode := input.InvoiceCode
 	if invoiceCode == "" {
@@ -307,7 +294,10 @@ func (q *qpay) CheckPayment(invoiceId string, pageLimit, pageNumber int64) (Qpay
 	var response QpayPaymentCheckResponse
 	err := q.httpRequestQPay(req, &response, QPayPaymentCheck, "")
 	if err != nil {
-		return response, err
+		// Return the zero value like every other method: a half-filled
+		// payment-check result alongside an error invites the caller to
+		// read Rows/PaidAmount as if the check had succeeded.
+		return QpayPaymentCheckResponse{}, err
 	}
 
 	return response, nil

@@ -38,8 +38,11 @@ type (
 		AccessToken      string `json:"access_token"`       // Хандалтын токен
 		ExpiresIn        int64  `json:"expires_in"`         // Хандалтын токены хүчинтэй хугацаа (Unix timestamp)
 		Scope            string `json:"scope"`              // Хандах хүрээ
-		NotBeforePolicy  string `json:"not-before-policy"`  // Бодлого
-		SessionState     string `json:"session_state"`      // Сессийн төлөв
+		// NotBeforePolicy [Бодлого]. qPay (Keycloak) энэ талбарыг тоо эсвэл
+		// тэмдэгт мөрөөр буцаадаг тул `any`. Тогтмол төрөл зааж өгвөл нэг л
+		// төрөл өөрчлөгдөхөд нэвтрэлт бүхэлдээ унана.
+		NotBeforePolicy any    `json:"not-before-policy"`
+		SessionState    string `json:"session_state"` // Сессийн төлөв
 	}
 
 	// QPayCreateInvoiceInput [Нэхэмжлэх үүсгэх оролтын өгөгдөл]

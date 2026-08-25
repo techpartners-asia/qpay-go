@@ -3,7 +3,10 @@ package qpay_wechat
 import (
 	"encoding/json"
 	"fmt"
-	"net/url"
+	"net/http"
+	"sync"
+
+	"github.com/techpartners-asia/qpay-go/utils"
 )
 
 type qpay_auth struct {
@@ -13,7 +16,10 @@ type qpay_auth struct {
 	callback    string
 	invoiceCode string
 	merchantId  string
+
+	mu          sync.RWMutex
 	loginObject *qpayLoginResponse
+	client      *http.Client
 }
 
 // Wechat not supported
@@ -30,30 +36,27 @@ type QPayAuth interface {
 }
 
 func New(username, password, endpoint, callback, invoiceCode, merchantId string) QPayAuth {
-	return &qpay_auth{
+	q := &qpay_auth{
 		endpoint:    endpoint,
 		password:    password,
 		username:    username,
 		callback:    callback,
 		invoiceCode: invoiceCode,
 		merchantId:  merchantId,
-		loginObject: func() *qpayLoginResponse {
-			authObj, authErr := authQPayV2(username, password, endpoint, callback, invoiceCode, merchantId)
-			if authErr != nil {
-				// err = authErr
-				return &qpayLoginResponse{}
-			}
-			return &authObj
-		}(),
+		client:      utils.NewHTTPClient(),
 	}
+
+	// Warm the token cache. A failure here is not fatal: authQPayV2 retries
+	// on the first API call. Storing an empty login object on failure (as this
+	// used to) would have made every later request go out unauthenticated.
+	if authObj, err := authQPayV2(q.client, username, password, endpoint); err == nil {
+		q.loginObject = &authObj
+	}
+
+	return q
 }
 
 func (q *qpay_auth) CreateInvoice(input QPayCreateInvoiceInput) (QPaySimpleInvoiceResponse, QPayAuth, error) {
-	vals := url.Values{}
-	for k, v := range input.CallbackParam {
-		vals.Add(k, v)
-	}
-
 	amountInt := int64(input.Amount)
 	request := QPaySimpleInvoiceRequest{
 		InvoiceCode:         q.invoiceCode,
@@ -62,7 +65,7 @@ func (q *qpay_auth) CreateInvoice(input QPayCreateInvoiceInput) (QPaySimpleInvoi
 		InvoiceReceiverCode: input.InvoiceReceiverCode,
 		InvoiceDescription:  input.InvoiceDescription,
 		Amount:              amountInt,
-		CallbackUrl:         fmt.Sprintf("%s?%s", q.callback, vals.Encode()),
+		CallbackUrl:         utils.BuildCallbackURL(q.callback, input.CallbackParam),
 	}
 
 	res, err := q.httpRequest(request, QPayInvoiceCreate, "")
@@ -71,7 +74,9 @@ func (q *qpay_auth) CreateInvoice(input QPayCreateInvoiceInput) (QPaySimpleInvoi
 	}
 
 	var response QPaySimpleInvoiceResponse
-	json.Unmarshal(res, &response)
+	if err := json.Unmarshal(res, &response); err != nil {
+		return QPaySimpleInvoiceResponse{}, q, fmt.Errorf("qpay: decode invoice create response: %w", err)
+	}
 
 	return response, q, nil
 }
@@ -82,7 +87,9 @@ func (q *qpay_auth) GetInvoice(invoiceId string) (QpayInvoiceGetResponse, QPayAu
 	}
 
 	var response QpayInvoiceGetResponse
-	json.Unmarshal(res, &response)
+	if err := json.Unmarshal(res, &response); err != nil {
+		return QpayInvoiceGetResponse{}, q, fmt.Errorf("qpay: decode invoice get response: %w", err)
+	}
 
 	return response, q, nil
 }
@@ -93,7 +100,9 @@ func (q *qpay_auth) CancelInvoice(invoiceId string) (interface{}, QPayAuth, erro
 	}
 
 	var response interface{}
-	json.Unmarshal(res, &response)
+	if err := json.Unmarshal(res, &response); err != nil {
+		return nil, q, fmt.Errorf("qpay: decode response: %w", err)
+	}
 
 	return response, q, nil
 }
@@ -105,7 +114,9 @@ func (q *qpay_auth) GetPayment(invoiceId string) (interface{}, QPayAuth, error) 
 	}
 
 	var response interface{}
-	json.Unmarshal(res, &response)
+	if err := json.Unmarshal(res, &response); err != nil {
+		return nil, q, fmt.Errorf("qpay: decode response: %w", err)
+	}
 
 	return response, q, nil
 }
@@ -124,7 +135,9 @@ func (q *qpay_auth) CheckPayment(invoiceId string, pageLimit, pageNumber int64) 
 		return response, q, err
 	}
 
-	json.Unmarshal(res, &response)
+	if err := json.Unmarshal(res, &response); err != nil {
+		return QpayPaymentCheckResponse{}, q, fmt.Errorf("qpay: decode payment check response: %w", err)
+	}
 
 	return response, q, nil
 }
@@ -153,7 +166,9 @@ func (q *qpay_auth) CancelPayment(invoiceId, paymentUUID string) (QpayPaymentChe
 		return response, q, err
 	}
 
-	json.Unmarshal(res, &response)
+	if err := json.Unmarshal(res, &response); err != nil {
+		return QpayPaymentCheckResponse{}, q, fmt.Errorf("qpay: decode payment cancel response: %w", err)
+	}
 
 	return response, q, nil
 }
@@ -171,7 +186,9 @@ func (q *qpay_auth) RefundPayment(invoiceId, paymentUUID string) (interface{}, Q
 		return response, q, err
 	}
 
-	json.Unmarshal(res, &response)
+	if err := json.Unmarshal(res, &response); err != nil {
+		return nil, q, fmt.Errorf("qpay: decode payment refund response: %w", err)
+	}
 
 	return response, q, nil
 }
