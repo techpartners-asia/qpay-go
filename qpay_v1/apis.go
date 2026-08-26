@@ -141,6 +141,12 @@ func (q *qpay) Login(ctx context.Context) (Token, error) {
 		return Token{}, err
 	}
 
+	// Rejected credentials are not a provider outage: the caller can tell the
+	// two apart and avoid counting a configuration mistake against qPay.
+	if status == http.StatusUnauthorized || status == http.StatusForbidden {
+		return Token{}, fmt.Errorf("%w (Status: %d): %s", ErrUnauthorized,
+			status, utils.TruncateForError(string(body)))
+	}
 	if status != http.StatusOK {
 		return Token{}, fmt.Errorf("%s-QPay auth response (Status: %d)",
 			time.Now().Format(utils.TimeFormatYYYYMMDDHHMMSS), status)

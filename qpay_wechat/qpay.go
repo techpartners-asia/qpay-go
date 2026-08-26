@@ -1,6 +1,7 @@
 package qpay_wechat
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -17,14 +18,37 @@ type qpay_auth struct {
 	invoiceCode string
 	merchantId  string
 
-	mu          sync.RWMutex
-	loginObject *qpayLoginResponse
-	client      *http.Client
+	// token is the credential installed by SetToken. The SDK reads it and
+	// never populates it on its own; see Token.
+	mu    sync.RWMutex
+	token Token
+
+	client *http.Client
 }
 
 // Wechat not supported
 
+// QPayAuth [QPay WeChat SDK Interface]
+//
+// # Authentication
+//
+// This SDK does not manage tokens. Obtain one with [QPayAuth.Login] (or
+// [QPayAuth.Refresh]), install it with [QPayAuth.SetToken], and every call
+// carries it. A call made with no token installed fails with [ErrNoToken]; a
+// call whose token qPay rejects fails with [ErrUnauthorized].
 type QPayAuth interface {
+	// Login [Access Token авах] — one request, no caching.
+	Login(ctx context.Context) (Token, error)
+
+	// Refresh [Access Token шинэчлэх] — one request, no caching.
+	Refresh(ctx context.Context, refreshToken string) (Token, error)
+
+	// SetToken installs the token subsequent calls carry.
+	SetToken(token Token)
+
+	// Token returns the installed token.
+	Token() Token
+
 	// CreateInvoice(input QPayCreateInvoiceInput) (QPaySimpleInvoiceResponse, QPayAuth, error)
 	// GetInvoice(invoiceId string) (QpayInvoiceGetResponse, QPayAuth, error)
 	// CancelInvoice(invoiceId string) (interface{}, QPayAuth, error)
@@ -35,6 +59,8 @@ type QPayAuth interface {
 	// GetPaymentList()
 }
 
+// New performs no network I/O. The returned client has no token until one is
+// installed with [QPayAuth.SetToken]; see [QPayAuth] on authentication.
 func New(username, password, endpoint, callback, invoiceCode, merchantId string) QPayAuth {
 	q := &qpay_auth{
 		endpoint:    endpoint,
@@ -44,13 +70,6 @@ func New(username, password, endpoint, callback, invoiceCode, merchantId string)
 		invoiceCode: invoiceCode,
 		merchantId:  merchantId,
 		client:      utils.NewHTTPClient(),
-	}
-
-	// Warm the token cache. A failure here is not fatal: authQPayV2 retries
-	// on the first API call. Storing an empty login object on failure (as this
-	// used to) would have made every later request go out unauthenticated.
-	if authObj, err := authQPayV2(q.client, username, password, endpoint); err == nil {
-		q.loginObject = &authObj
 	}
 
 	return q

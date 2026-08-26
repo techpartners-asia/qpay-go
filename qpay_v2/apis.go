@@ -155,6 +155,12 @@ func (q *qpay) Login(ctx context.Context) (Token, error) {
 		return Token{}, err
 	}
 	defer closeBody(res)
+	// Rejected credentials are not a provider outage: the caller can tell the
+	// two apart and avoid counting a configuration mistake against qPay.
+	if res.StatusCode() == http.StatusUnauthorized || res.StatusCode() == http.StatusForbidden {
+		return Token{}, fmt.Errorf("%w (Status: %d): %s", ErrUnauthorized,
+			res.StatusCode(), utils.TruncateForError(res.String()))
+	}
 	if !res.IsStatusSuccess() {
 		return Token{}, fmt.Errorf("%s-QPay auth failed: %s (Status: %d)",
 			time.Now().Format("2006-01-02 15:04:05"), utils.TruncateForError(res.String()), res.StatusCode())
