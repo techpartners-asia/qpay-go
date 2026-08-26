@@ -1,0 +1,29 @@
+package qpay_v2
+
+import "github.com/techpartners-asia/qpay-go/utils"
+
+// Token is a qPay access token; see [utils.Token] for the ownership contract.
+// It is aliased rather than redefined so a token obtained from one qPay
+// package can be handed to another without conversion.
+type Token = utils.Token
+
+var (
+	// ErrNoToken is returned when a call is made before [QPay.SetToken].
+	ErrNoToken = utils.ErrNoToken
+
+	// ErrUnauthorized is returned when qPay rejects the installed token.
+	ErrUnauthorized = utils.ErrUnauthorized
+)
+
+// tokenFrom converts a login or refresh response into a Token.
+func tokenFrom(res qpayLoginResponse) Token {
+	return Token{
+		AccessToken:      res.AccessToken,
+		RefreshToken:     res.RefreshToken,
+		TokenType:        res.TokenType,
+		ExpiresAt:        utils.TokenExpiresAt(res.ExpiresIn),
+		RefreshExpiresAt: utils.TokenExpiresAt(res.RefreshExpiresIn),
+		Scope:            res.Scope,
+		SessionState:     res.SessionState,
+	}
+}

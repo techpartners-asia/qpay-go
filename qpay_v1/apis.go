@@ -2,6 +2,7 @@ package qpay_v1
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -44,12 +45,18 @@ var (
 // It centralises the error handling that was previously missing: transport
 // errors, request-construction errors and body closing.
 func (q *qpay) doRequest(method, url string, payload []byte, headers map[string]string) ([]byte, int, error) {
+	return q.doRequestCtx(context.Background(), method, url, payload, headers)
+}
+
+// doRequestCtx is doRequest bound to a context, for the auth calls the caller
+// drives explicitly.
+func (q *qpay) doRequestCtx(ctx context.Context, method, url string, payload []byte, headers map[string]string) ([]byte, int, error) {
 	var reader io.Reader
 	if payload != nil {
 		reader = bytes.NewReader(payload)
 	}
 
-	req, err := http.NewRequest(method, url, reader)
+	req, err := http.NewRequestWithContext(ctx, method, url, reader)
 	if err != nil {
 		// Reachable with an id containing a control character or space.
 		return nil, 0, fmt.Errorf("qpay: build request: %w", err)
@@ -73,16 +80,15 @@ func (q *qpay) doRequest(method, url string, payload []byte, headers map[string]
 }
 
 func (q *qpay) httpRequestQPay(body interface{}, api utils.API, urlExt string) ([]byte, error) {
-	authObj, err := q.authQPayV1()
-	if err != nil {
-		return nil, err
+	token := q.Token()
+	if token.IsZero() {
+		// The SDK no longer authenticates behind the caller's back; an absent
+		// token is a wiring mistake, not a gateway failure.
+		return nil, ErrNoToken
 	}
 
-	q.mu.Lock()
-	q.loginObject = &authObj
-	q.mu.Unlock()
-
 	var payload []byte
+	var err error
 	if body != nil {
 		payload, err = json.Marshal(body)
 		if err != nil {
@@ -93,10 +99,17 @@ func (q *qpay) httpRequestQPay(body interface{}, api utils.API, urlExt string) (
 	url := q.endpoint + api.Url + utils.EscapePathSegment(urlExt)
 	response, status, err := q.doRequest(api.Method, url, payload, map[string]string{
 		"Content-Type":  utils.HttpContent,
-		"Authorization": "Bearer " + authObj.AccessToken,
+		"Authorization": "Bearer " + token.AccessToken,
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	// A rejected token is its own error so the caller can tell "replace the
+	// token and retry" apart from "qPay refused this request".
+	if status == http.StatusUnauthorized || status == http.StatusForbidden {
+		return nil, fmt.Errorf("%w (Status: %d): %s", ErrUnauthorized,
+			status, utils.TruncateForError(string(response)))
 	}
 
 	if status != http.StatusOK {
@@ -107,101 +120,94 @@ func (q *qpay) httpRequestQPay(body interface{}, api utils.API, urlExt string) (
 	return response, nil
 }
 
-// authQPayV1 [Login to qpay]
-func (q *qpay) authQPayV1() (QpayLoginResponse, error) {
-	q.mu.RLock()
-	if q.loginObject != nil && tokenStillValid(int64(q.loginObject.ExpiresIn)) {
-		cached := *q.loginObject
-		q.mu.RUnlock()
-		return cached, nil
-	}
-	q.mu.RUnlock()
-
-	var authRes QpayLoginResponse
-
+// Login [qPay-ээс Access Token авах]
+//
+// Login performs exactly one request and caches nothing: the returned token is
+// the caller's to hold, store and install with [QPay.SetToken].
+func (q *qpay) Login(ctx context.Context) (Token, error) {
 	payload, err := json.Marshal(&QpayLogin{
 		ClientID:     q.client_id,
 		ClientSecret: q.client_secret,
 		GrantType:    q.grant_type,
-		RefreshToken: q.refresh_token,
 	})
 	if err != nil {
-		return authRes, fmt.Errorf("qpay: encode auth request: %w", err)
+		return Token{}, fmt.Errorf("qpay: encode auth request: %w", err)
 	}
 
-	body, status, err := q.doRequest(QPayAuthToken.Method, q.endpoint+QPayAuthToken.Url, payload, map[string]string{
+	body, status, err := q.doRequestCtx(ctx, QPayAuthToken.Method, q.endpoint+QPayAuthToken.Url, payload, map[string]string{
 		"Content-Type": utils.HttpContent,
 	})
 	if err != nil {
-		return authRes, err
+		return Token{}, err
 	}
 
 	if status != http.StatusOK {
-		return authRes, fmt.Errorf("%s-QPay auth response (Status: %d)",
+		return Token{}, fmt.Errorf("%s-QPay auth response (Status: %d)",
 			time.Now().Format(utils.TimeFormatYYYYMMDDHHMMSS), status)
 	}
 
+	var authRes QpayLoginResponse
 	if err := json.Unmarshal(body, &authRes); err != nil {
-		return QpayLoginResponse{}, fmt.Errorf("qpay: decode auth response: %w", err)
+		return Token{}, fmt.Errorf("qpay: decode auth response: %w", err)
 	}
 	if authRes.AccessToken == "" {
-		// A 200 with no token would otherwise be cached and every later call
-		// would silently go out unauthenticated.
-		return QpayLoginResponse{}, errors.New("qpay: auth response contained no access token")
+		// Returning a tokenless response as success would send every later
+		// call out unauthenticated.
+		return Token{}, errors.New("qpay: auth response contained no access token")
 	}
 
-	return authRes, nil
+	return tokenFrom(authRes), nil
 }
 
-func (q *qpay) refreshToken() (QpayLoginResponse, error) {
-	var authRes QpayLoginResponse
-
-	q.mu.RLock()
-	if q.loginObject == nil {
-		q.mu.RUnlock()
-		return authRes, errors.New("qpay: no session to refresh")
-	}
-	refresh := q.loginObject.RefreshToken
-	q.mu.RUnlock()
-
-	if refresh == "" {
-		return authRes, errors.New("qpay: no refresh token available")
+// Refresh [Refresh token ашиглан access token шинэчлэх]
+//
+// Refresh is a single request, like [QPay.Login], and does not fall back to a
+// full login when the refresh token is rejected: the caller decides.
+func (q *qpay) Refresh(ctx context.Context, refreshToken string) (Token, error) {
+	if refreshToken == "" {
+		return Token{}, errors.New("qpay: refresh token is required")
 	}
 
-	body, status, err := q.doRequest(QPayAuthRefresh.Method, q.endpoint+QPayAuthRefresh.Url, nil, map[string]string{
+	body, status, err := q.doRequestCtx(ctx, QPayAuthRefresh.Method, q.endpoint+QPayAuthRefresh.Url, nil, map[string]string{
 		"Content-Type":  utils.HttpContent,
-		"Authorization": "Bearer " + refresh,
+		"Authorization": "Bearer " + refreshToken,
 	})
 	if err != nil {
-		return authRes, err
+		return Token{}, err
 	}
 
+	if status == http.StatusUnauthorized || status == http.StatusForbidden {
+		return Token{}, fmt.Errorf("%w (Status: %d): %s", ErrUnauthorized,
+			status, utils.TruncateForError(string(body)))
+	}
 	if status != http.StatusOK {
-		return authRes, fmt.Errorf("%s-QPay token refresh response (Status: %d)",
+		return Token{}, fmt.Errorf("%s-QPay token refresh response (Status: %d)",
 			time.Now().Format(utils.TimeFormatYYYYMMDDHHMMSS), status)
 	}
 
+	var authRes QpayLoginResponse
 	if err := json.Unmarshal(body, &authRes); err != nil {
-		return QpayLoginResponse{}, fmt.Errorf("qpay: decode refresh response: %w", err)
+		return Token{}, fmt.Errorf("qpay: decode refresh response: %w", err)
+	}
+	if authRes.AccessToken == "" {
+		return Token{}, errors.New("qpay: refresh response contained no access token")
 	}
 
-	return authRes, nil
+	return tokenFrom(authRes), nil
 }
 
-// tokenStillValid reports whether a qPay expiry field is comfortably in the
-// future. qPay documents expires_in as a Unix timestamp, but sends a plain
-// duration in seconds on some deployments; values too small to be a
-// timestamp are therefore treated as a duration from now.
-func tokenStillValid(expiresIn int64) bool {
-	if expiresIn <= 0 {
-		return false
-	}
+// SetToken installs the token subsequent calls will carry. Passing the zero
+// Token clears it, which makes the next call fail with [ErrNoToken] rather
+// than reach qPay unauthenticated.
+func (q *qpay) SetToken(token Token) {
+	q.mu.Lock()
+	q.token = token
+	q.mu.Unlock()
+}
 
-	const minPlausibleTimestamp = 1_000_000_000 // 2001-09-09
-	if expiresIn < minPlausibleTimestamp {
-		// Duration semantics: we cannot tell when it was issued, so do not cache.
-		return false
-	}
-
-	return time.Now().Before(time.Unix(expiresIn, 0).Add(-1 * time.Minute))
+// Token returns the installed token.
+func (q *qpay) Token() Token {
+	q.mu.RLock()
+	defer q.mu.RUnlock()
+	return q.token
 }

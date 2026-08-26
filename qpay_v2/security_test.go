@@ -1,6 +1,7 @@
 package qpay_v2
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -117,26 +118,9 @@ func TestAuthWithoutAccessTokenIsRejected(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	q := newTestQPay(srv.URL)
-	if _, err := q.authQPayV2(); err == nil {
+	q := newUnauthedQPay(srv.URL)
+	if _, err := q.Login(context.Background()); err == nil {
 		t.Fatal("expected an error when auth returns no access token")
-	}
-}
-
-// expires_in arriving as a relative duration must not be read as a Unix
-// timestamp in 1970 (which forces a re-auth on every single call).
-func TestExpiryHeuristic(t *testing.T) {
-	if tokenStillValid(0) {
-		t.Error("zero expiry must not be valid")
-	}
-	if tokenStillValid(36000) {
-		t.Error("a duration-shaped value must not be treated as a timestamp")
-	}
-	if !tokenStillValid(time.Now().Add(time.Hour).Unix()) {
-		t.Error("a future timestamp must be valid")
-	}
-	if tokenStillValid(time.Now().Add(-time.Hour).Unix()) {
-		t.Error("a past timestamp must not be valid")
 	}
 }
 
@@ -190,8 +174,8 @@ func TestNumericNotBeforePolicyDoesNotBreakAuth(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	q := newTestQPay(srv.URL)
-	res, err := q.authQPayV2()
+	q := newUnauthedQPay(srv.URL)
+	res, err := q.Login(context.Background())
 	if err != nil {
 		t.Fatalf("auth failed on numeric not-before-policy: %v", err)
 	}
