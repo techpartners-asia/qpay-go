@@ -391,7 +391,7 @@ fmt.Println(payment.InvoiceStatus) // OPEN, PAID, CLOSED
 
 `qpay_quick.New()` accepts the same `WithToken(t)` and `WithClient(c)` options as
 `qpay_v2`, and manages tokens the same way: `Login`, `Refresh`, `SetToken`. The
-`Token` type is shared across `qpay_v2`, `qpay_quick` and `qpay_v1`.
+`Token` type is shared between `qpay_v2` and `qpay_quick`.
 
 ---
 

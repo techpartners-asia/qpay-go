@@ -1,7 +1,6 @@
 package qpay_v1
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -15,60 +14,37 @@ type qpay struct {
 	client_id     string
 	client_secret string
 	grant_type    string
+	refresh_token string
 	callback      string
 	merchantId    string
 	templateId    string
 	branchId      string
 	posId         string
 
-	// token is the credential installed by SetToken. The SDK reads it and
-	// never populates it on its own; see Token.
-	mu    sync.RWMutex
-	token Token
-
-	client *http.Client
+	mu          sync.RWMutex
+	loginObject *QpayLoginResponse
+	client      *http.Client
 }
 
-// QPay [QPay V1 SDK Interface]
-//
-// # Authentication
-//
-// This SDK does not manage tokens. Obtain one with [QPay.Login] (or
-// [QPay.Refresh]), install it with [QPay.SetToken], and every call below
-// carries it. A call made with no token installed fails with [ErrNoToken]; a
-// call whose token qPay rejects fails with [ErrUnauthorized], which is the
-// signal to obtain a fresh token and retry.
 type QPay interface {
-	// Login [Access Token авах] — one request, no caching.
-	Login(ctx context.Context) (Token, error)
-
-	// Refresh [Access Token шинэчлэх] — one request, no caching.
-	Refresh(ctx context.Context, refreshToken string) (Token, error)
-
-	// SetToken installs the token subsequent calls carry.
-	SetToken(token Token)
-
-	// Token returns the installed token.
-	Token() Token
-
 	CreateInvoice(input QPayInvoiceCreateRequest) (QPaySimpleInvoiceResponse, error)
 	GetInvoice(invoiceId string) (QpayInvoiceGetResponse, error)
 	CheckPayment(paymentID string) (QpayPaymentCheckResponse, error)
 }
 
-// New performs no network I/O. The returned client has no token until one is
-// installed with [QPay.SetToken]; see [QPay] on authentication.
 func New(client_id, client_secret, endpoint, callback, merchantId, templateId, branchId, posId string) QPay {
 	return &qpay{
 		endpoint:      endpoint,
 		client_id:     client_id,
 		client_secret: client_secret,
 		grant_type:    "client",
+		refresh_token: "",
 		callback:      callback,
 		merchantId:    merchantId,
 		templateId:    templateId,
 		branchId:      branchId,
 		posId:         posId,
+		loginObject:   nil,
 		client:        utils.NewHTTPClient(),
 	}
 }
