@@ -48,14 +48,14 @@ You can pass options to `New()` to customize behavior:
 
 | Option | Description |
 |---|---|
-| `WithSyncAuth()` | Block until auth completes (default: async background auth) |
+| `WithToken(t)` | Install a token at construction, so the first call needs no login round trip |
 | `WithClient(c)` | Inject a custom `resty.Client` (e.g. for custom TLS, proxies, or logging) |
 
 ```go
-// Sync auth — New() blocks until token is ready
+// Start with a token you already hold — from a shared cache, say
 client := qpay.New(
     "USERNAME", "PASSWORD", "ENDPOINT", "CALLBACK", "INVOICE_CODE", "MERCHANT_ID",
-    qpay.WithSyncAuth(),
+    qpay.WithToken(cachedToken),
 )
 
 // Custom HTTP client
@@ -254,7 +254,45 @@ barimt, err := client.CancelEbarimt("PAYMENT_ID")
 
 ### Token Management
 
-The SDK handles authentication automatically. Tokens are cached and refreshed before expiry — you do not need to manage tokens manually. All methods are safe for concurrent use.
+**The caller owns the token.** The SDK does not cache one, does not renew one in
+the background, and does not log in on your behalf:
+
+| Method | Behaviour |
+|---|---|
+| `Login(ctx)` | One request to `/auth/token`. Returns a `Token`; installs nothing. |
+| `Refresh(ctx, refreshToken)` | One request to `/auth/refresh`. Does not fall back to a full login. |
+| `SetToken(t)` | Installs the token every subsequent call carries. The zero `Token` clears it. |
+| `Token()` | Returns the installed token. |
+
+```go
+client := qpay.New("USERNAME", "PASSWORD", "ENDPOINT", "CALLBACK", "CODE", "MERCHANT")
+
+token, err := client.Login(ctx)
+if err != nil {
+    return err
+}
+client.SetToken(token)
+
+invoice, err := client.CreateInvoice(input)
+```
+
+`Token.ExpiresAt` is when to replace it. It is the **zero time** when QPay sent
+an expiry that could not be anchored — it documents `expires_in` as a Unix
+timestamp but some deployments send a bare duration — and such a token should be
+used once and not reused.
+
+Two errors are worth matching with `errors.Is`:
+
+- `ErrNoToken` — a call was made before `SetToken`. A wiring mistake, not a
+  gateway failure.
+- `ErrUnauthorized` — QPay refused the token (or, from `Login`, the
+  credentials). Obtain a new token and retry; the refused request was never
+  processed, so retrying cannot double-create an invoice.
+
+`New()` performs no network I/O, and `SetToken`/`Token` are mutex-guarded, so a
+client is safe to share across goroutines. Renewing before expiry, collapsing
+concurrent logins and sharing a token between processes are the caller's to do —
+which is the point: only the caller knows whether the token is shared.
 
 ---
 
@@ -351,7 +389,9 @@ payment, err := client.CheckPayment("INVOICE_ID")
 fmt.Println(payment.InvoiceStatus) // OPEN, PAID, CLOSED
 ```
 
-`qpay_quick.New()` accepts the same `WithSyncAuth()` and `WithClient(c)` options as `qpay_v2`.
+`qpay_quick.New()` accepts the same `WithToken(t)` and `WithClient(c)` options as
+`qpay_v2`, and manages tokens the same way: `Login`, `Refresh`, `SetToken`. The
+`Token` type is shared between `qpay_v2` and `qpay_quick`.
 
 ---
 

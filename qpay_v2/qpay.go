@@ -1,6 +1,7 @@
 package qpay_v2
 
 import (
+	"context"
 	"crypto/tls"
 	"net"
 	"net/http"
@@ -8,7 +9,6 @@ import (
 	"time"
 
 	"github.com/techpartners-asia/qpay-go/utils"
-	"golang.org/x/sync/singleflight"
 	"resty.dev/v3"
 )
 
@@ -19,15 +19,40 @@ type qpay struct {
 	callback    string
 	invoiceCode string
 	merchantId  string
-	syncAuth    bool // If true, New() blocks until auth completes
-	loginObject *qpayLoginResponse
-	mu          sync.RWMutex
-	authGroup   singleflight.Group // Coalesces concurrent auth calls into one
-	client      *resty.Client
+
+	// token is the credential installed by SetToken. The SDK reads it and
+	// never populates it on its own: expiry tracking, refresh scheduling and
+	// deduplication of concurrent logins all belong to the caller, which is
+	// the only layer that knows whether the token is shared beyond this
+	// process. See Token.
+	mu    sync.RWMutex
+	token Token
+
+	client *resty.Client
 }
 
 // QPay [QPay V2 SDK Interface / Интерфэйс]
+//
+// # Authentication
+//
+// This SDK does not manage tokens. Obtain one with [QPay.Login] (or
+// [QPay.Refresh]), install it with [QPay.SetToken], and every call below
+// carries it. A call made with no token installed fails with [ErrNoToken]; a
+// call whose token qPay rejects fails with [ErrUnauthorized], which is the
+// signal to obtain a fresh token and retry.
 type QPay interface {
+	// Login [Access Token авах] — one request, no caching.
+	Login(ctx context.Context) (Token, error)
+
+	// Refresh [Access Token шинэчлэх] — one request, no caching.
+	Refresh(ctx context.Context, refreshToken string) (Token, error)
+
+	// SetToken installs the token subsequent calls carry.
+	SetToken(token Token)
+
+	// Token returns the installed token.
+	Token() Token
+
 	// CreateInvoice [Төлбөрийн нэхэмжлэл үүсгэх]
 	// See: https://developer.qpay.mn/#invoice-Create
 	CreateInvoice(input QPayCreateInvoiceInput) (QPaySimpleInvoiceResponse, error)
@@ -83,13 +108,13 @@ func WithClient(client *resty.Client) Option {
 	}
 }
 
-// WithSyncAuth [Эхлүүлэхдээ auth дуустал хүлээх]
-// By default, auth runs in the background so New() returns immediately.
-// Use this option to block until auth completes — useful when you need
-// a valid token before making the first API call.
-func WithSyncAuth() Option {
+// WithToken [Токеныг эхлүүлэхдээ шингээх]
+// Installs a token at construction time, for a caller that already holds a
+// valid one — from a shared cache, say — and wants the first call to go out
+// authenticated without a login round trip.
+func WithToken(token Token) Option {
 	return func(q *qpay) {
-		q.syncAuth = true
+		q.token = token
 	}
 }
 
@@ -100,6 +125,9 @@ func WithSyncAuth() Option {
 // callback: Төлбөр төлөгдсөний дараа дуудагдах URL
 // invoiceCode: qPay нэхэмжлэхийн код
 // merchantId: Байгууллагын ID
+//
+// New performs no network I/O. The returned client has no token until one is
+// installed with [QPay.SetToken] or [WithToken]; see [QPay] on authentication.
 func New(username, password, endpoint, callback, invoiceCode, merchantId string, options ...Option) QPay {
 	q := &qpay{
 		endpoint:    endpoint,
@@ -113,24 +141,6 @@ func New(username, password, endpoint, callback, invoiceCode, merchantId string,
 
 	for _, opt := range options {
 		opt(q)
-	}
-
-	if q.syncAuth {
-		// Block until auth completes with retry.
-		// If QPay is temporarily unreachable, retry up to 3 times
-		// with a 1-second delay between attempts.
-		for i := 0; i < 3; i++ {
-			if _, err := q.authQPayV2(); err == nil {
-				break
-			}
-			if i < 2 {
-				time.Sleep(1 * time.Second)
-			}
-		}
-	} else {
-		// Attempt login in background to warm the token cache.
-		// If it fails, authQPayV2 will retry on the first API call.
-		go q.authQPayV2() //nolint:errcheck
 	}
 
 	return q

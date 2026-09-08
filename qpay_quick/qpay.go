@@ -1,31 +1,53 @@
 package qpay_quick
 
 import (
+	"context"
 	"crypto/tls"
 	"net"
 	"net/http"
 	"sync"
 	"time"
 
-	"golang.org/x/sync/singleflight"
 	"resty.dev/v3"
 )
 
 type qpayquick struct {
-	endpoint    string
-	password    string
-	username    string
-	callback    string
-	terminalID  string
-	syncAuth    bool // If true, New() blocks until auth completes
-	loginObject *qpayLoginResponse
-	mu          sync.RWMutex
-	authGroup   singleflight.Group // Coalesces concurrent auth calls into one
-	client      *resty.Client
+	endpoint   string
+	password   string
+	username   string
+	callback   string
+	terminalID string
+
+	// token is the credential installed by SetToken. The SDK reads it and
+	// never populates it on its own; see Token.
+	mu    sync.RWMutex
+	token Token
+
+	client *resty.Client
 }
 
 // QPayQuick [QPay Quick Pay SDK Interface / Интерфэйс]
+//
+// # Authentication
+//
+// This SDK does not manage tokens. Obtain one with [QPayQuick.Login] (or
+// [QPayQuick.Refresh]), install it with [QPayQuick.SetToken], and every call
+// below carries it. A call made with no token installed fails with
+// [ErrNoToken]; a call whose token qPay rejects fails with [ErrUnauthorized],
+// which is the signal to obtain a fresh token and retry.
 type QPayQuick interface {
+	// Login [Access Token авах] — one request, no caching.
+	Login(ctx context.Context) (Token, error)
+
+	// Refresh [Access Token шинэчлэх] — one request, no caching.
+	Refresh(ctx context.Context, refreshToken string) (Token, error)
+
+	// SetToken installs the token subsequent calls carry.
+	SetToken(token Token)
+
+	// Token returns the installed token.
+	Token() Token
+
 	// CreateCompany [Байгууллага бүртгэх]
 	CreateCompany(input QpayCompanyCreateRequest) (QpayCompanyCreateResponse, error)
 
@@ -79,13 +101,13 @@ func WithClient(client *resty.Client) Option {
 	}
 }
 
-// WithSyncAuth [Эхлүүлэхдээ auth дуустал хүлээх]
-// By default, auth runs in the background so New() returns immediately.
-// Use this option to block until auth completes — useful when you need
-// a valid token before making the first API call.
-func WithSyncAuth() Option {
+// WithToken [Токеныг эхлүүлэхдээ шингээх]
+// Installs a token at construction time, for a caller that already holds a
+// valid one — from a shared cache, say — and wants the first call to go out
+// authenticated without a login round trip.
+func WithToken(token Token) Option {
 	return func(q *qpayquick) {
-		q.syncAuth = true
+		q.token = token
 	}
 }
 
@@ -95,6 +117,10 @@ func WithSyncAuth() Option {
 // endpoint: Sandbox эсвэл Production хаяг
 // callback: Төлбөр төлөгдсөний дараа дуудагдах URL
 // terminalID: qPay-ээс өгсөн терминалын дугаар
+//
+// New performs no network I/O. The returned client has no token until one is
+// installed with [QPayQuick.SetToken] or [WithToken]; see [QPayQuick] on
+// authentication.
 func New(username, password, endpoint, callback, terminalID string, options ...Option) QPayQuick {
 	q := &qpayquick{
 		endpoint:   endpoint,
@@ -107,19 +133,6 @@ func New(username, password, endpoint, callback, terminalID string, options ...O
 
 	for _, opt := range options {
 		opt(q)
-	}
-
-	if q.syncAuth {
-		for i := 0; i < 3; i++ {
-			if _, err := q.authQPayV2(); err == nil {
-				break
-			}
-			if i < 2 {
-				time.Sleep(1 * time.Second)
-			}
-		}
-	} else {
-		go q.authQPayV2() //nolint:errcheck
 	}
 
 	return q
