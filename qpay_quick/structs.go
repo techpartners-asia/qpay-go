@@ -157,7 +157,7 @@ type (
 	QpayInvoiceResponse struct {
 		ID                  string                    `json:"id"`
 		TerminalID          string                    `json:"terminal_id"`
-		Amount              string                    `json:"amount"`
+		Amount              Amount                    `json:"amount"`
 		QrCode              string                    `json:"qr_code"`
 		Description         string                    `json:"description"`
 		InvoiceStatus       string                    `json:"invoice_status"`
@@ -195,7 +195,7 @@ type (
 	QpayInvoiceGetResponse struct {
 		ID                  string                    `json:"id"`
 		TerminalID          string                    `json:"terminal_id"`
-		Amount              string                    `json:"amount"`
+		Amount              Amount                    `json:"amount"`
 		QrCode              string                    `json:"qr_code"`
 		Description         string                    `json:"description"`
 		InvoiceStatus       string                    `json:"invoice_status"`
@@ -241,7 +241,7 @@ type (
 		ID                 string             `json:"id"`
 		TerminalID         string             `json:"terminal_id"`
 		WalletCustomerID   string             `json:"wallet_customer_id"`
-		Amount             string             `json:"amount"`
+		Amount             Amount             `json:"amount"`
 		Currency           string             `json:"currency"`
 		PaymentName        string             `json:"payment_name"`
 		PaymentDescription string             `json:"payment_description"`
@@ -261,7 +261,7 @@ type (
 		AccountBankName     string `json:"account_bank_name"`
 		AccountNumber       string `json:"account_number"`
 		Status              string `json:"status"`
-		Amount              string `json:"amount"`
+		Amount              Amount `json:"amount"`
 		Currency            string `json:"currency"`
 	}
 
