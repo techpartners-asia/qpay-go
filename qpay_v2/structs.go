@@ -125,8 +125,8 @@ type (
 		TaxProductCode     string            `json:"tax_product_code,omitempty"`
 		LineDescription    string            `json:"line_description"`
 		Barcode            string            `json:"barcode,omitempty"`
-		LineQuantity       string            `json:"line_quantity"`
-		LineUnitPrice      string            `json:"line_unit_price"`
+		LineQuantity       Amount            `json:"line_quantity"`
+		LineUnitPrice      Amount            `json:"line_unit_price"`
 		Note               string            `json:"note,omitempty"`
 		ClassificationCode string            `json:"classification_code,omitempty"`
 		Taxes              []*QPayEbarimtTax `json:"taxes,omitempty"`
@@ -136,7 +136,7 @@ type (
 	QPayEbarimtTax struct {
 		TaxCode     QPayTaxCode `json:"tax_code"`
 		Description string      `json:"description"`
-		Amount      string      `json:"amount"`
+		Amount      Amount      `json:"amount"`
 		Note        string      `json:"note,omitempty"`
 	}
 
@@ -260,8 +260,8 @@ type (
 	QpayLineResponse struct {
 		TaxProductCode  string                     `json:"tax_product_code"` // Татварын барааны код
 		LineDescription string                     `json:"line_description"` // Мөрийн тайлбар
-		LineQuantity    string                     `json:"line_quantity"`    // Тоо ширхэг (Текст)
-		LineUnitPrice   string                     `json:"line_unit_price"`  // Нэгж үнэ (Текст)
+		LineQuantity    Amount                     `json:"line_quantity"`    // Тоо ширхэг (Текст)
+		LineUnitPrice   Amount                     `json:"line_unit_price"`  // Нэгж үнэ (Текст)
 		Note            string                     `json:"note"`             // Тэмдэглэл
 		Discounts       []*QpayAdjustmentDiscount  `json:"discounts"`        // Хөнгөлөлтүүд
 		Surcharges      []*QpayAdjustmentSurcharge `json:"surcharges"`       // Нэмэгдлүүд
@@ -330,18 +330,18 @@ type (
 		InvoiceStatus      string              `json:"invoice_status"`      // Нэхэмжлэлийн төлөв (OPEN, CLOSED, CANCELLED)
 		SenderInvoiceNo    string              `json:"sender_invoice_no"`   // Байгууллагын нэхэмжлэлийн дугаар
 		InvoiceDescription string              `json:"invoice_description"` // Нэхэмжлэлийн утга
-		GrossAmount        string              `json:"gross_amount"`        // Үндсэн дүн
-		DiscountAmount     string              `json:"discount_amount"`     // Хөнгөлөлтийн дүн
-		SurchargeAmount    string              `json:"surcharge_amount"`    // Нэмэгдлийн дүн
-		TaxAmount          string              `json:"tax_amount"`          // Татварын дүн
-		TotalAmount        string              `json:"total_amount"`        // Эцсийн төлөх дүн
+		GrossAmount        Amount              `json:"gross_amount"`        // Үндсэн дүн
+		DiscountAmount     Amount              `json:"discount_amount"`     // Хөнгөлөлтийн дүн
+		SurchargeAmount    Amount              `json:"surcharge_amount"`    // Нэмэгдлийн дүн
+		TaxAmount          Amount              `json:"tax_amount"`          // Татварын дүн
+		TotalAmount        Amount              `json:"total_amount"`        // Эцсийн төлөх дүн
 		InvoiceDueDate     string              `json:"invoice_due_date"`    // Дуусах хугацаа
 		ExpiryDate         string              `json:"expiry_date"`         // Хүчингүй болох огноо
 		EnableExpiry       bool                `json:"enable_expiry"`       // Дуусах хугацаа ашиглах
 		AllowPartial       bool                `json:"allow_partial"`       // Хувааж төлөх
 		AllowExceed        bool                `json:"allow_exceed"`        // Илүү төлөлт
-		MinimumAmount      string              `json:"minimum_amount"`      // Хамгийн бага дүн
-		MaximumAmount      string              `json:"maximum_amount"`      // Хамгийн их дүн
+		MinimumAmount      Amount              `json:"minimum_amount"`      // Хамгийн бага дүн
+		MaximumAmount      Amount              `json:"maximum_amount"`      // Хамгийн их дүн
 		SenderBranchCode   string              `json:"sender_branch_code"`  // Салбарын код
 		CallbackUrl        string              `json:"callback_url"`        // Хариу авах URL
 		Note               string              `json:"note"`                // Тэмдэглэл
@@ -364,8 +364,8 @@ type (
 	QpayTransaction struct {
 		PaymentID           string                         `json:"payment_id"`
 		PaymentStatus       string                         `json:"payment_status"`
-		PaymentFee          string                         `json:"payment_fee"`
-		PaymentAmount       string                         `json:"payment_amount"`
+		PaymentFee          Amount                         `json:"payment_fee"`
+		PaymentAmount       Amount                         `json:"payment_amount"`
 		PaymentCurrency     string                         `json:"payment_currency"`
 		PaymentDate         string                         `json:"payment_date"`
 		PaymentWallet       string                         `json:"payment_wallet"`
@@ -380,7 +380,7 @@ type (
 		TransactionID       string                         `json:"transaction_id"`       // QPay гүйлгээний дугаар
 		TransactionNo       string                         `json:"transaction_no"`       // Банкны гүйлгээний дугаар
 		TransactionDate     string                         `json:"transaction_date"`     // Гүйлгээ хийгдсэн огноо
-		TransactionAmount   string                         `json:"transaction_amount"`   // Гүйлгээний дүн
+		TransactionAmount   Amount                         `json:"transaction_amount"`   // Гүйлгээний дүн
 		TransactionCurrency string                         `json:"transaction_currency"` // Валют
 		AccountName         string                         `json:"account_name"`         // Дансны нэр
 		AccountNumber       string                         `json:"account_number"`       // Дансны дугаар
@@ -400,11 +400,11 @@ type (
 		CardNumber           string `json:"card_number"`
 		CardType             string `json:"card_type"`
 		IsCrossBorder        bool   `json:"is_cross_border"`
-		Amount               string `json:"amount"`
+		Amount               Amount `json:"amount"`
 		Currency             string `json:"currency"`
 		Date                 string `json:"date"`
 		Status               string `json:"status"`
-		TransactionAmount    string `json:"transaction_amount"`
+		TransactionAmount    Amount `json:"transaction_amount"`
 		TransactionCurrency  string `json:"transaction_currency"`
 		TransactionDate      string `json:"transaction_date"`
 		TransactionStatus    string `json:"transaction_status"`
@@ -419,7 +419,7 @@ type (
 		AccountBankName     string `json:"account_bank_name"`
 		AccountNumber       string `json:"account_number"`
 		Status              string `json:"status"`
-		Amount              string `json:"amount"`
+		Amount              Amount `json:"amount"`
 		Currency            string `json:"currency"`
 		SettlementStatus    string `json:"settlement_status"`
 	}
@@ -452,9 +452,9 @@ type (
 		PaymentID           string                         `json:"payment_id"`            // Төлбөрийн ID
 		PaymentStatus       string                         `json:"payment_status"`        // Төлөв (NEW, PAID, FAILED, REFUNDED)
 		PaymentDate         string                         `json:"payment_date"`          // Төлөгдсөн хугацаа
-		PaymentFee          string                         `json:"payment_fee"`           // Шимтгэлийн дүн
-		TrxFee              string                         `json:"trx_fee"`               // Шимтгэлийн дүн (payment/check)
-		PaymentAmount       string                         `json:"payment_amount"`        // Төлөгдсөн дүн
+		PaymentFee          Amount                         `json:"payment_fee"`           // Шимтгэлийн дүн
+		TrxFee              Amount                         `json:"trx_fee"`               // Шимтгэлийн дүн (payment/check)
+		PaymentAmount       Amount                         `json:"payment_amount"`        // Төлөгдсөн дүн
 		PaymentCurrency     string                         `json:"payment_currency"`      // Валют
 		PaymentWallet       string                         `json:"payment_wallet"`        // Ашигласан воллет
 		PaymentType         string                         `json:"payment_type"`          // Төрөл (P2P, CARD)
@@ -505,8 +505,8 @@ type (
 		PaymentID          string `json:"payment_id"`          // QPay-ээс үүссэн гүйлгээний дугаар
 		PaymentDate        string `json:"payment_date"`        // Гүйлгээний огноо
 		PaymentStatus      string `json:"payment_status"`      // NEW, FAILED, PAID, REFUNDED
-		PaymentFee         string `json:"payment_fee"`         // Шимтгэлийн дүн
-		PaymentAmount      string `json:"payment_amount"`      // Гүйлгээний үнийн дүн
+		PaymentFee         Amount `json:"payment_fee"`         // Шимтгэлийн дүн
+		PaymentAmount      Amount `json:"payment_amount"`      // Гүйлгээний үнийн дүн
 		PaymentCurrency    string `json:"payment_currency"`    // Валют (MNT)
 		PaymentWallet      string `json:"payment_wallet"`      // Воллетийн дугаар
 		PaymentName        string `json:"payment_name"`        // Төлбөрийн нэр (Юнивишн г.м)
@@ -545,9 +545,9 @@ type (
 		PaidBy               string              `json:"paid_by"`
 		ObjectType           string              `json:"object_type"`
 		ObjectID             string              `json:"object_id"`
-		Amount               string              `json:"amount"`
-		VatAmount            string              `json:"vat_amount"`
-		CityTaxAmount        string              `json:"city_tax_amount"`
+		Amount               Amount              `json:"amount"`
+		VatAmount            Amount              `json:"vat_amount"`
+		CityTaxAmount        Amount              `json:"city_tax_amount"`
 		EbarimtQRData        string              `json:"ebarimt_qr_data"`
 		EbarimtLottery       string              `json:"ebarimt_lottery"`
 		Note                 string              `json:"note"`
@@ -577,11 +577,11 @@ type (
 		TaxProductCode      string `json:"tax_product_code"`
 		BarCode             string `json:"bar_code"`
 		Name                string `json:"name"`
-		UnitPrice           string `json:"unit_price"`
-		Quantity            string `json:"quantity"`
-		Amount              string `json:"amount"`
-		CityTaxAmount       string `json:"city_tax_amount"`
-		VatAmount           string `json:"vat_amount"`
+		UnitPrice           Amount `json:"unit_price"`
+		Quantity            Amount `json:"quantity"`
+		Amount              Amount `json:"amount"`
+		CityTaxAmount       Amount `json:"city_tax_amount"`
+		VatAmount           Amount `json:"vat_amount"`
 		Note                string `json:"note"`
 		CreatedBy           string `json:"created_by"`
 		CreatedDate         string `json:"created_date"`

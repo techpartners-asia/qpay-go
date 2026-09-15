@@ -7,6 +7,11 @@ import "github.com/techpartners-asia/qpay-go/utils"
 // qPay package can be handed to another without conversion.
 type Token = utils.Token
 
+// Amount is a qPay money field; see [utils.Amount] for why it is not a plain
+// string. Aliased rather than redefined so an amount from one qPay package can
+// be handed to another.
+type Amount = utils.Amount
+
 var (
 	// ErrNoToken is returned when a call is made before [QPayQuick.SetToken].
 	ErrNoToken = utils.ErrNoToken
