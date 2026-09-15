@@ -198,3 +198,15 @@ func NewHTTPClient() *http.Client {
 // 	res, err = http.DefaultClient.Do(req)
 // 	return
 // }
+
+// StatusSuccess reports whether an HTTP status is 2xx.
+//
+// Spelled out against the raw status code rather than resty's own helper on
+// purpose: that helper is IsSuccess in resty v3 beta and IsStatusSuccess in
+// v3 rc, so calling it pins this module to one resty release and drags every
+// consumer onto the same one. Consumers embed qPay alongside other SDKs still
+// built against the beta, and a rename inside a dependency is not a reason to
+// force a migration on them. StatusCode() exists in both.
+func StatusSuccess(code int) bool {
+	return code >= 200 && code < 300
+}

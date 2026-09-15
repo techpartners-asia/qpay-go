@@ -114,3 +114,20 @@ func TestRandStringNonPositive(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 }
+
+// Guards the 2xx boundaries. This replaced resty's own IsStatusSuccess so the
+// module stops pinning its consumers to one resty release; an off-by-one here
+// would turn a 300 into a success and hand the caller a zero-valued payment.
+func TestStatusSuccess(t *testing.T) {
+	for _, tc := range []struct {
+		code int
+		want bool
+	}{
+		{199, false}, {200, true}, {201, true}, {204, true},
+		{299, true}, {300, false}, {302, false}, {401, false}, {500, false},
+	} {
+		if got := StatusSuccess(tc.code); got != tc.want {
+			t.Errorf("StatusSuccess(%d) = %v, want %v", tc.code, got, tc.want)
+		}
+	}
+}

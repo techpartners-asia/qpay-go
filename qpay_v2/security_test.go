@@ -103,7 +103,7 @@ func TestNonSuccessStatusIsAnError(t *testing.T) {
 		// Do not follow the redirect, so the 3xx reaches our status check.
 		client: resty.New().
 			SetTimeout(5 * time.Second).
-			SetRedirectPolicy(resty.RedirectNoPolicy()),
+			SetRedirectPolicy(resty.NoRedirectPolicy()),
 	}
 
 	if _, err := q.GetInvoice("abc"); err == nil {
