@@ -132,7 +132,7 @@ func (q *qpayquick) httpRequestQPay(body interface{}, result interface{}, api ut
 	// Anything outside 2xx is an error. Checking only for >= 400 let 3xx
 	// responses through with `result` left at its zero value, which reads
 	// downstream as a successful-but-empty payment.
-	if !res.IsStatusSuccess() {
+	if !utils.StatusSuccess(res.StatusCode()) {
 		return fmt.Errorf("%s-QPay response error: %s (Status: %d)",
 			time.Now().Format("2006-01-02 15:04:05"),
 			utils.TruncateForError(res.String()),
@@ -176,7 +176,7 @@ func (q *qpayquick) Login(ctx context.Context) (Token, error) {
 		return Token{}, fmt.Errorf("%w (Status: %d): %s", ErrUnauthorized,
 			res.StatusCode(), utils.TruncateForError(res.String()))
 	}
-	if !res.IsStatusSuccess() {
+	if !utils.StatusSuccess(res.StatusCode()) {
 		return Token{}, fmt.Errorf("%s-QPay auth failed: %s (Status: %d)",
 			time.Now().Format("2006-01-02 15:04:05"), utils.TruncateForError(res.String()), res.StatusCode())
 	}
@@ -214,7 +214,7 @@ func (q *qpayquick) Refresh(ctx context.Context, refreshToken string) (Token, er
 		return Token{}, fmt.Errorf("%w (Status: %d): %s", ErrUnauthorized,
 			res.StatusCode(), utils.TruncateForError(res.String()))
 	}
-	if !res.IsStatusSuccess() {
+	if !utils.StatusSuccess(res.StatusCode()) {
 		return Token{}, fmt.Errorf("%s-QPay refresh failed: %s (Status: %d)",
 			time.Now().Format("2006-01-02 15:04:05"), utils.TruncateForError(res.String()), res.StatusCode())
 	}
